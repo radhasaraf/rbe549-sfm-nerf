@@ -1,0 +1,15 @@
+5 images of Unity Hall
+Samsung S22 Ultra
+f/1.8 aperture
+ISO 50
+1/500 sec shutter speed
+
+camera calibration 
+rad-tan model
+2 radial 
+1 tangential
+Matlab R2022 camera calibrator
+
+images
+distortion corrected
+resized 800 x 600 px
