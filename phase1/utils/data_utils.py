@@ -11,6 +11,10 @@ def load_camera_instrinsics():
     """
     pass
 
+# E = Tx X R (3 + 3) => 7
+# R [r1,r2,r3] => r3 = r1 x r2 (3), ||r1|| = 1,||r2|| = 1 => 4
+# scale invariant
+
 def load_feature_matching_files():
     #TODO
     pass

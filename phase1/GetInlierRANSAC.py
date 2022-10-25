@@ -1,27 +1,5 @@
 import numpy as np
 
-def generic_RANSAC():
-    """
-    description:
-        a generic RANSAC taken from WikiPedia
-    input:
-        data  – A set of observations.
-        model – A model to explain observed data points.
-        n     – Minimum number of data points required to estimate model parameters.
-        k     – Maximum number of iterations allowed in the algorithm.
-        t     – Threshold value to determine data points that are fit well by model.
-        d     – Number of close data points required to assert that a model fits well to data
-    output:
-        bestFit - model parameters which best fit the data (or null if no good model is found)
-    """
-    iterations = 0
-    bestFit = None
-    bestErr = None
-    for i in range(k):
-        maybeInliers = random.sample()
-        maybeModel = model(maybeInliers)
-    pass
-
 def get_inliers_RANSAC():
     """
     input:
@@ -30,5 +8,12 @@ def get_inliers_RANSAC():
     output:
         F - fundamental matrix 3 x 3
     """
-    #
+    # sample some random points assuming they are inliers
+    # fit model
+    # check if error is below some threshold for rest of the points
+    #   if it is then add them inlier set
+    # if count of prev inlier set is less than count of curr inlier set
+    #   then replace prev set with curr set
+    # reestimate F for all the inliers
+    # should be able to plot outliers and inlier matches
     pass

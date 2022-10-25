@@ -17,7 +17,16 @@ def show_epipolars():
         F - fundamental matrix of epipolar pairs 3 x 3
         features - list of features N x 2
         line_color - epipolar line colors
-        feature_marker - shape of features
+        feature_marker - shape of the feature
         epipole_marker - shape of epipole marker (#TODO if it exists on image)
+    """
+    pass
+
+def show_matches():
+    """
+    input:
+        img1 - first image
+        img2 - second image
+        matches - 
     """
     pass
