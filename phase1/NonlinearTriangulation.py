@@ -12,7 +12,7 @@ def refine_triangulated_coords(v1, v2, tri_coords):
 
     """
     # Homogenize tri_coords
-    # Compute P: cam x extr for both cameras
+    # Compute P: cam x extr for both cams, making sure to consider T wrt to camera
     # Define residual function
     # Call scipy.optimize.least_squares which will take residual function
     # Get refined coords from optimized param vector

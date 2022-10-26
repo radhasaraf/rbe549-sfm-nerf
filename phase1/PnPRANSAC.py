@@ -3,13 +3,14 @@ from linearPnP import get_camera_extr_using_pnp
 def refine_extr_using_ransac():
     """
     inputs:
-        features:
-        world_points:
+        features: N x 2
+        world_points: N x 3
     outputs:
-        R:
-        T:
+        R: 3 x 3
+        T: 3 x 1
     """
     # sample 6 random points assuming they are inliers
+    # Make sure to consider t in P wrt camera
     # fit model
     # check if error is below some threshold for rest of the points
     #   if it is then add them inlier set
