@@ -33,3 +33,13 @@ def show_matches():
 
 def show_reprojection():
     pass
+
+
+def show_camera():
+    pass
+
+def show_rotation():
+    """
+    plot new axis based on new rotation
+    """
+    pass
