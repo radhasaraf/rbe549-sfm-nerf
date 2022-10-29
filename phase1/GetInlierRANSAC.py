@@ -24,15 +24,24 @@ def get_inliers_RANSAC(v1,v2,max_iterations,threshold):
 
         # fit model
         F = estimate_fundamental_matrix(sample_v1, sample_v2) # 3 x 3
-        
+
         error = F @ v1.T # 3 x N
         error = error.T # N x 3
         error = np.multiply(v2, error) # N x 3
-        error = np.sum(error,axis=1) # N, 
+        error = np.sum(error,axis=1) # N,
 
         # check if error is below some threshold for rest of the points
-        curr_inliers = error < threshold # N, 
+        curr_inliers = abs(error) < threshold # N,
         if np.sum(curr_inliers) > np.sum(max_inliers):
+            # print(f"error:{error}")
+            # print(f"{np.sum(curr_inliers)}")
             max_inliers = curr_inliers
 
-    return max_inliers
+    v1_inliers = v1[max_inliers]
+    v2_inliers = v2[max_inliers]
+
+    # Un-homogenize
+    v1_inliers = np.delete(v1_inliers, 2, axis=1)
+    v2_inliers = np.delete(v2_inliers, 2, axis=1)
+
+    return [v1_inliers, v2_inliers]

@@ -2,14 +2,14 @@ import numpy as np
 
 def estimate_fundamental_matrix(v1, v2):
     """
-    input: 
+    input:
         v1 - N x 3
         v2 - N x 3
     output:
         F - fundamental matrix 3 x 3
     """
     # construct Ax = 0
-    x1, y1 = v1[:,0], v1[:,1] # N, 
+    x1, y1 = v1[:,0], v1[:,1] # N,
     x2, y2 = v2[:,0], v2[:,1] # N,
     ones = np.ones(x1.shape[0])
 
@@ -38,4 +38,3 @@ def estimate_fundamental_matrix(v1, v2):
     # reestimate F with new D
     # make sure that rank of reestimated F is 2
     # plot the epipolar lines with reestimated F
-    pass
