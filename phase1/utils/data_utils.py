@@ -1,6 +1,5 @@
 import csv
 import glob
-from collections import defaultdict
 from typing import List
 
 import cv2
@@ -65,8 +64,7 @@ def load_and_get_feature_matches(path):
         file_name = file_name[-1] # Gets number of matching file
         match_file_names.append(file_name)
 
-    D = defaultdict()
-
+    D = {}
     for i, match_file in zip(match_file_names, matching_files):
         with open(match_file) as file:
             reader = csv.reader(file, delimiter=' ')
@@ -84,17 +82,15 @@ def load_and_get_feature_matches(path):
 
                 # read j and subsequent feature coords in j
                 for idx in range(n_matches_wrt_curr):
-                    j = int(row[idx*3 + 6])
+                    j = row[idx*3 + 6]
                     uj, vj = float(row[idx*3 + 7]), float(row[idx*3 + 8])
 
-                    key = (i,j)
+                    key = (int(i), int(j))
                     value = np.array([(ui,vi,uj,vj)])
-                    if key in D:
-                        D[key] = np.vstack((D[key],value))
-                    else:
-                        D[key] = value
 
-    newD = defaultdict()
+                    D[key] = np.vstack((D[key],value)) if key in D else value
+
+    newD = {}
     for key,value in D.items():
         v1,v2 = np.split(value, 2, axis=1)
         newD[key] = [v1,v2]
