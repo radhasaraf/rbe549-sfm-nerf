@@ -1,10 +1,11 @@
 import csv
-from typing import List
-from collections import defaultdict
 import glob
-import pprint
+from collections import defaultdict
+from typing import List
+
 import cv2
 import numpy as np
+
 
 def homogenize_coords(coords):
     """
@@ -45,7 +46,7 @@ def load_camera_intrinsics(path: str) -> List[List]:
 
 def load_and_get_feature_matches(path):
     """
-    Gives out a datastructure containing all img-img 
+    Gives out a datastructure containing all img-img
         correspondences
     inputs:
         path - path from where it has to read
@@ -55,9 +56,14 @@ def load_and_get_feature_matches(path):
 
     # get a list of all matching*.txt files
     matching_files = glob.glob(f"{path}/matching*.txt",recursive=False)
-    match_file_names = [ 
-        int(match_file.replace(f"{path}",'').replace("matching",'').replace(f".txt",'')) for match_file in matching_files 
-    ]
+
+    match_file_names = []
+    for match_file in matching_files:
+        # file_name = match_file.rsplit(".", 1)[0][-1]
+        file_name = match_file.rsplit(".", 1) # splits path into list of non-extension, extension parts
+        file_name = file_name[0] # Gets the non-extension part
+        file_name = file_name[-1] # Gets number of matching file
+        match_file_names.append(file_name)
 
     D = defaultdict()
 
@@ -76,7 +82,7 @@ def load_and_get_feature_matches(path):
                 # read current feature coords
                 ui, vi = float(row[4]), float(row[5])
 
-                # read j and subsequent feature coords in j 
+                # read j and subsequent feature coords in j
                 for idx in range(n_matches_wrt_curr):
                     j = int(row[idx*3 + 6])
                     uj, vj = float(row[idx*3 + 7]), float(row[idx*3 + 8])
@@ -92,5 +98,5 @@ def load_and_get_feature_matches(path):
     for key,value in D.items():
         v1,v2 = np.split(value, 2, axis=1)
         newD[key] = [v1,v2]
-        
+
     return newD
