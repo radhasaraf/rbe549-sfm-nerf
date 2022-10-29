@@ -1,7 +1,8 @@
-import numpy as np
 import random
-from utils.data_utils import homogenize_coords
+
 from EstimateFundamentalMatrix import *
+from utils.data_utils import homogenize_coords
+
 
 def get_inliers_RANSAC(v1,v2,max_iterations,threshold):
     """
