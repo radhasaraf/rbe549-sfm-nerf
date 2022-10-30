@@ -7,21 +7,6 @@ import numpy as np
 import pprint
 
 
-def homogenize_coords(coords):
-    """
-    N x 2 -> N x 3
-    """
-    ret = np.concatenate((coords,np.ones((coords.shape[0],1))),axis=1)
-    return ret
-
-def unhomogenize_coords(coords):
-    """
-    Nx3 -> Nx2
-    """
-    ret = np.delete(coords, 2, axis=1)
-    return ret
-    
-
 def load_images(path, extn = ".png"):
     """
     input:
@@ -50,6 +35,7 @@ def load_camera_intrinsics(path: str) -> List[List]:
         reader = csv.reader(file, delimiter=' ')
         for row in reader:
             K.append([float(row[i]) for i in range(3)])
+    K = np.array(K)
     return K
 
 def load_and_get_feature_matches(path):

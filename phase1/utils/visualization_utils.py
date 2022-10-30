@@ -1,8 +1,9 @@
 import cv2
 import numpy as np
-from utils.data_utils import homogenize_coords
+from utils.helpers import homogenize_coords
+from EstimateFundamentalMatrix import get_epipoles, get_epipolars
 
-def show_features(img, features, window_name, color=(0, 255, 0)):
+def plot_features(img, features, color=(0, 255, 0), marker_type=cv2.MARKER_CROSS, thickness=4):
     """
     input:
         img - image on which features have to be plotted
@@ -12,7 +13,7 @@ def show_features(img, features, window_name, color=(0, 255, 0)):
     """
     img_copy = img
     for feat in features:
-        cv2.drawMarker(img_copy, [int(feat[0]), int(feat[1])], color)
+        cv2.drawMarker(img_copy, [int(feat[0]), int(feat[1])], color, marker_type, thickness)
 
     #cv2.imshow(window_name, img_copy)
 
@@ -116,8 +117,12 @@ def show_epipolars(img1, img2, F, features, window_name, line_color=(0, 0, 0)):
     # multiply each fundamental matrix with other image feature correspondence
     v1 = homogenize_coords(features[0]) # N x 3
     v2 = homogenize_coords(features[1]) # N x 3
-    lines1 = F.T @ v2.T # (3 x 3 @ 3 x N) = 3 x N
-    lines2 = F @ v1.T # (3 x 3 @ 3 x N) = 3 x N
+
+    # epipolars 
+    lines1, lines2  = get_epipolars(F, v1, v2)
+
+    # epipoles
+    e1, e2 = get_epipoles(F)
 
     first_points1 = get_first_point(lines1,img1.shape) # N x 2
     first_points2 = get_first_point(lines2,img2.shape) # N x 2
@@ -129,16 +134,18 @@ def show_epipolars(img1, img2, F, features, window_name, line_color=(0, 0, 0)):
     for first_point, second_point in zip(first_points1, second_points1):
         cv2.line(img1_copy, first_point, second_point, line_color, 1)
 
-    show_features(img1_copy, v1, f"{window_name}_1")
-
+    plot_features(img1_copy, v1)
+    plot_features(img1_copy, [e1], color=(0,0,255), marker_type=cv2.MARKER_STAR,thickness=6)
+    
     img2_copy = img2.copy()
     for first_point, second_point in zip(first_points2, second_points2):
         cv2.line(img2_copy, first_point, second_point, line_color, 1)
 
-    show_features(img2_copy, v2, f"{window_name}_2")
+    plot_features(img2_copy, v2)
+    plot_features(img2_copy, [e2], color=(0,0,255), marker_type=cv2.MARKER_STAR,thickness=6)
 
-    cv2.imshow(f"{window_name}_1", img1_copy)
-    cv2.imshow(f"{window_name}_2", img2_copy)
+    concat = np.hstack((img1_copy,img2_copy))
+    cv2.imshow(f"{window_name}", concat)
 
 def show_reprojection():
     pass

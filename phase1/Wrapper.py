@@ -1,13 +1,16 @@
 import numpy as np
 import cv2
 import argparse
+from matplotlib import pyplot as plt
 from utils.visualization_utils import *
 from utils.data_utils import *
 from EstimateFundamentalMatrix import *
 from GetInlierRANSAC import *
+from EssentialMatrixFromFundamentalMatrix import *
+from ExtractCameraPose import *
+from LinearTriangulation import *
 
 from TestOutputs import *
-    
 
 def main(args):
     base_path = args.basePath
@@ -27,17 +30,37 @@ def main(args):
     # get inliers RANSAC for all images
     corrected_pair_feat_matches = {}
     for key, value in img_pair_feat_matches.items():
-        corrected_pair_feat_matches[key] = get_inliers_RANSAC(value[0],value[1],1000,0.05)
+        corrected_pair_feat_matches[key] = get_inliers_RANSAC(value[0],value[1],1000,0.02)
 
-    if args.display:
+    if args.debug:
         show_before_after_RANSAC(imgs, img_pair_feat_matches, corrected_pair_feat_matches)
         show_sample_matches_epipolars(imgs, corrected_pair_feat_matches)
 
     # estimate Fundamental matrix (F)
-    #F = get_12_fundamental_matrix(corrected_pair_feat_matches)
-    # estimate essential matrix E from Fundamental matrix F
-
+    F = get_ij_fundamental_matrix(1, 2, corrected_pair_feat_matches)
     if args.display:
+        show_epipolars(imgs[1], imgs[2], F, corrected_pair_feat_matches[(1,2)], f"epipolars_1_2")
+
+    # estimate essential matrix E from Fundamental matrix F
+    E = essential_from_fundamental(K, F, args)
+
+    if args.debug:
+        test_E(K, F, E, imgs[1], imgs[2], "epipoles_from_E_and_F")
+
+    # extract camera pose from essential matrix
+    Cs, Rs = extract_camera_pose(E)
+
+    # triangulate the feature points to world points using camera poses
+    v1, v2 = corrected_pair_feat_matches[(1,2)]
+    Xs_all_poses = []
+    colors = ['r','b','g','pink']
+    for C,R,color in zip(Cs,Rs,colors):
+        Xs = triangulate_points(K, np.zeros(3), np.eye(3), C, R, v1, v2)
+        Xs_all_poses.append(Xs)
+        plt.scatter(Xs[:,0],Xs[:,2],color=color)
+    
+    plt.show()
+    if args.debug or args.display:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 

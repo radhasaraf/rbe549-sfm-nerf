@@ -1,7 +1,7 @@
 import random
 
 from EstimateFundamentalMatrix import *
-from utils.data_utils import homogenize_coords,unhomogenize_coords
+from utils.helpers import homogenize_coords,unhomogenize_coords
 
 random.seed(42)
 
