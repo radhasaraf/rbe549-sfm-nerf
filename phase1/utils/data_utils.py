@@ -4,14 +4,23 @@ from typing import List
 
 import cv2
 import numpy as np
+import pprint
 
 
 def homogenize_coords(coords):
     """
-    Nx2 -> Nx3
+    N x 2 -> N x 3
     """
     ret = np.concatenate((coords,np.ones((coords.shape[0],1))),axis=1)
     return ret
+
+def unhomogenize_coords(coords):
+    """
+    Nx3 -> Nx2
+    """
+    ret = np.delete(coords, 2, axis=1)
+    return ret
+    
 
 def load_images(path, extn = ".png"):
     """
@@ -22,8 +31,8 @@ def load_images(path, extn = ".png"):
         images - list of images - N
     """
     img_files = glob.glob(f"{path}/*{extn}",recursive=False)
-    img_names = [img_file.replace(f"{path}/",'').replace(f"{extn}",'') for img_file in img_files]
-    imgs = [cv2.imread(img_file) for img_file in img_files]
+    img_names = [img_file.replace(f"{path}",'').replace(f"{extn}",'') for img_file in img_files]
+    imgs = {int(img_name) : cv2.imread(img_file) for img_file,img_name in zip(img_files,img_names)}
     return imgs, img_names
 
 def load_camera_intrinsics(path: str) -> List[List]:
@@ -55,6 +64,7 @@ def load_and_get_feature_matches(path):
 
     # get a list of all matching*.txt files
     matching_files = glob.glob(f"{path}/matching*.txt",recursive=False)
+    matching_files = [f"{path}/matching1.txt"]
 
     match_file_names = []
     for match_file in matching_files:

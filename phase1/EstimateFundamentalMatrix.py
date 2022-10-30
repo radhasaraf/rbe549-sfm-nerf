@@ -26,15 +26,12 @@ def estimate_fundamental_matrix(v1, v2):
             [f[1],f[4],f[7]],
             [f[2],f[5],f[8]]
         ])
+    F = F/f[8]
 
     # take SVD of F
     UF, sigmaF, VF = np.linalg.svd(F)
     sigmaF[2] = 0 # enforcing rank 2 constraint
     reestimatedF = UF @ np.diag(sigmaF) @ VF
-    return reestimatedF
-    # plot the epipolar lines with this F
-    #   expected output: all epipolar do not intersect at one point (or no epipole)
-    # set 3rd element of D to 0
-    # reestimate F with new D
-    # make sure that rank of reestimated F is 2
-    # plot the epipolar lines with reestimated F
+    reestimatedF = reestimatedF/reestimatedF[2,2]
+
+    return F, reestimatedF
