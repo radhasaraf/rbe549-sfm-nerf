@@ -16,8 +16,13 @@ def load_images(path, extn = ".png"):
         images - list of images - N
     """
     img_files = glob.glob(f"{path}/*{extn}",recursive=False)
-    img_names = [img_file.replace(f"{path}",'').replace(f"{extn}",'') for img_file in img_files]
-    imgs = {int(img_name) : cv2.imread(img_file) for img_file,img_name in zip(img_files,img_names)}
+
+    img_names = []
+    for img_file in img_files:
+        img_name = img_file.rsplit(".", 1)[0][-1]
+        img_names.append(img_name)
+
+    imgs = {int(img_name) : cv2.imread(img_file) for img_file, img_name in zip(img_files,img_names)}
     return imgs, img_names
 
 def load_camera_intrinsics(path: str) -> List[List]:
