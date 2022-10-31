@@ -21,8 +21,12 @@ def disambiguate_camera_poses(Cs, Rs, Xs):
 
         # For all points check cheirality for camera 2
         C = C.reshape((3,1)) # 3 x 1
-        cond = r3.T @ (X.T - C) # 1 x N
-        inliers = cond > 0
+
+        # Cheirality check for Camera 1 and 2
+        cond1 = X[:,2].T  # 1 x N
+        cond2 = r3.T @ (X.T - C)  # 1 x N
+
+        inliers = np.logical_and(cond1 > 0, cond2 > 0)
 
         if np.sum(inliers) > np.sum(max_inliers):
             correctC = C
