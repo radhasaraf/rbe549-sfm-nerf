@@ -9,6 +9,7 @@ from GetInlierRANSAC import *
 from EssentialMatrixFromFundamentalMatrix import *
 from ExtractCameraPose import *
 from LinearTriangulation import *
+from DisambiguateCameraPose import *
 
 from TestOutputs import *
 
@@ -53,13 +54,19 @@ def main(args):
     # triangulate the feature points to world points using camera poses
     v1, v2 = corrected_pair_feat_matches[(1,2)]
     Xs_all_poses = []
-    colors = ['r','b','g','pink']
+    colors = ['red','brown','greenyellow','teal']
     for C,R,color in zip(Cs,Rs,colors):
         Xs = triangulate_points(K, np.zeros(3), np.eye(3), C, R, v1, v2)
         Xs_all_poses.append(Xs)
-        plt.scatter(Xs[:,0],Xs[:,2],color=color)
-    
+        #plt.scatter(Xs[:,0],Xs[:,2],color=color,marker='x')
+    #plt.show()
+
+    # disambiguate the poses using chierality condition
+    C, R, X = disambiguate_camera_poses(Cs, Rs, Xs_all_poses)
+
+    plt.scatter(X[:, 0], X[:, 2], color='skyblue', marker='x')
     plt.show()
+    
     if args.debug or args.display:
         cv2.waitKey(0)
         cv2.destroyAllWindows()

@@ -18,21 +18,21 @@ def extract_camera_pose(E):
 
     # estimate C1, C2, C3, C4
     # possible translations from left null space of E
-    C =  UE[:,2] 
-    Cs = [C, -C, C, C]
+    U =  UE[:,2] 
+    Cs = [U, -U, U, -U]
 
     # estimate R1, R2, R3, R4
     # creating S (slide 7 lecture 14)
     S = np.array([
             [ 0,-1, 0 ],
             [ 1, 0, 0 ],
-            [ 0, 0, 0 ]
+            [ 0, 0, 1 ]
         ])
 
     # possible rotations based on the above S
-    R1 = UE @ S   @ VE
+    R1 = UE @ S @ VE
     R1 = get_R_from_matrix(R1)
-    R2 = UE @ S.T   @ VE
+    R2 = UE @ S.T @ VE
     R2 = get_R_from_matrix(R2)
     Rs = [R1,R1,R2,R2]
 

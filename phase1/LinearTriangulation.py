@@ -23,7 +23,7 @@ def triangulate_points(K, C1, R1, C2, R2, v1, v2):
     ## Construct perspective projection matrix(P) intr x extr
     # calculating translation of camera pose with respect to camera frame 
     C1 = C1.reshape((3,1))
-    T1 = -R1.T @ C1 # 3 x 1
+    T1 = - R1 @ C1 # 3 x 1
     P1 = K @ np.hstack((R1, T1)) # (3 x 3) @ (3 x 4) = 3 x 4
 
     C2 = C2.reshape((3,1))
