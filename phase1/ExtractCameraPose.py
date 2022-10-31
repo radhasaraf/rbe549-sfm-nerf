@@ -39,9 +39,11 @@ def extract_camera_pose(E):
     Cs_final = []
     Rs_final = []
     eps = 1e-2
-    for C,R in zip(Cs,Rs):
+
+    for C, R in zip(Cs, Rs):
         det_value = np.linalg.det(R)
-        if -1 - eps < det_value and det_value < -1 + eps :
+
+        if -1 - eps < det_value < -1 + eps:
             Cs_final.append(-C)
             Rs_final.append(-R)
         else:

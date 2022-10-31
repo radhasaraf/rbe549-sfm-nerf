@@ -31,7 +31,7 @@ def main(args):
     # get inliers RANSAC for all images
     corrected_pair_feat_matches = {}
     for key, value in img_pair_feat_matches.items():
-        corrected_pair_feat_matches[key] = get_inliers_RANSAC(value[0],value[1],1000,0.02)
+        corrected_pair_feat_matches[key] = get_inliers_RANSAC(value[0],value[1],1000,0.006)
 
     if args.debug:
         show_before_after_RANSAC(imgs, img_pair_feat_matches, corrected_pair_feat_matches)
@@ -58,8 +58,8 @@ def main(args):
     for C,R,color in zip(Cs,Rs,colors):
         Xs = triangulate_points(K, np.zeros(3), np.eye(3), C, R, v1, v2)
         Xs_all_poses.append(Xs)
-        #plt.scatter(Xs[:,0],Xs[:,2],color=color,marker='x')
-    #plt.show()
+    #     plt.scatter(Xs[:,0],Xs[:,2],color=color,marker='.')
+    # plt.show()
 
     # disambiguate the poses using chierality condition
     C, R, X = disambiguate_camera_poses(Cs, Rs, Xs_all_poses)

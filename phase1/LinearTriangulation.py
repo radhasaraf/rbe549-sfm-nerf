@@ -27,7 +27,7 @@ def triangulate_points(K, C1, R1, C2, R2, v1, v2):
     P1 = K @ np.hstack((R1, T1)) # (3 x 3) @ (3 x 4) = 3 x 4
 
     C2 = C2.reshape((3,1))
-    T2 = - R2.T @ C2 # 3 x 1
+    T2 = - R2 @ C2 # 3 x 1
     P2 = K @ np.hstack((R2, T2)) # (3 x 3) @ (3 x 4) = 3 x 4
 
     # Construct sys of lin. equations
@@ -48,6 +48,3 @@ def triangulate_points(K, C1, R1, C2, R2, v1, v2):
 
     Xs = np.vstack(Xs) # N x 3
     return Xs
-
-    # sanity check: All Zs should be positive
-
