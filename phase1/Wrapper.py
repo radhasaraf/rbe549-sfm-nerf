@@ -1,7 +1,6 @@
 import numpy as np
 import cv2
 import argparse
-from matplotlib import pyplot as plt
 from utils.visualization_utils import *
 from utils.data_utils import *
 from EstimateFundamentalMatrix import *
@@ -10,8 +9,9 @@ from EssentialMatrixFromFundamentalMatrix import *
 from ExtractCameraPose import *
 from LinearTriangulation import *
 from DisambiguateCameraPose import *
+from NonlinearTriangulation import refine_triangulated_coords
 
-from TestOutputs import *
+from ShowOutputs import *
 
 def main(args):
     base_path = args.basePath
@@ -54,23 +54,33 @@ def main(args):
     # triangulate the feature points to world points using camera poses
     v1, v2 = corrected_pair_feat_matches[(1,2)]
     Xs_all_poses = []
-    colors = ['red','brown','greenyellow','teal']
-    for C,R,color in zip(Cs,Rs,colors):
+
+    for C,R in zip(Cs,Rs):
         Xs = triangulate_points(K, np.zeros(3), np.eye(3), C, R, v1, v2)
         Xs_all_poses.append(Xs)
-    #     plt.scatter(Xs[:,0],Xs[:,2],color=color,marker='.')
-    # plt.show()
 
     # disambiguate the poses using chierality condition
-    C, R, X = disambiguate_camera_poses(Cs, Rs, Xs_all_poses)
+    C, R, X_linear = disambiguate_camera_poses(Cs, Rs, Xs_all_poses)
 
-    plt.scatter(X[:, 0], X[:, 2], color='skyblue', marker='x')
-    plt.show()
+    # perform non linear triangulation
+    X_non_linear = refine_triangulated_coords(K, np.zeros(3), np.eye(3), C, R, v1, v2, X_linear)
+
+    if args.display:
+        show_disambiguated_and_corrected_poses(Xs_all_poses, X_linear, X_non_linear)
+
+    ## camera registration
+    # perform LinearPnP
+    # optimize using NonLinearPnP
+    # new 3D points using Linear Triangulation
+    # optimize new 3D points using NonLinear Triangulation
+    # add new 3D points to whole data
+    # Build Visibility matrix
+    # perform Bundle Adjustment
     
     if args.debug or args.display:
+        plt.show()
         cv2.waitKey(0)
         cv2.destroyAllWindows()
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

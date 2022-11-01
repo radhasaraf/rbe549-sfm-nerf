@@ -1,16 +1,16 @@
 import numpy as np
 def homogenize_coords(coords):
     """
-    N x 2 -> N x 3
+    N x m -> N x (m+1)
     """
     ret = np.concatenate((coords,np.ones((coords.shape[0],1))),axis=1)
     return ret
 
 def unhomogenize_coords(coords):
     """
-    Nx3 -> Nx2
+    N x (m+1) -> N x m
     """
-    ret = np.delete(coords, 2, axis=1)
+    ret = np.delete(coords, coords.shape[1]-1, axis=1)
     return ret
     
 def skew(x):
