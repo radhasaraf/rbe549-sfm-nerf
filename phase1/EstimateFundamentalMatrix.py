@@ -26,7 +26,7 @@ def estimate_fundamental_matrix(v1, v2):
             [f[1],f[4],f[7]],
             [f[2],f[5],f[8]]
         ])
-    F = F/f[8]
+    #F = F/f[8]
 
     # take SVD of F
     UF, sigmaF, VF = np.linalg.svd(F)

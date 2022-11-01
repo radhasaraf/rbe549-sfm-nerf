@@ -31,7 +31,7 @@ def main(args):
     # get inliers RANSAC for all images
     corrected_pair_feat_matches = {}
     for key, value in img_pair_feat_matches.items():
-        corrected_pair_feat_matches[key] = get_inliers_RANSAC(value[0],value[1],1000,0.006)
+        corrected_pair_feat_matches[key] = get_inliers_RANSAC(value[0],value[1],1000,0.090)
 
     if args.debug:
         show_before_after_RANSAC(imgs, img_pair_feat_matches, corrected_pair_feat_matches)

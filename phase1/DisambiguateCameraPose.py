@@ -31,7 +31,7 @@ def disambiguate_camera_poses(Cs, Rs, Xs):
         if np.sum(inliers) > np.sum(max_inliers):
             correctC = C
             correctR = R
-            correctX = X
+            correctX = X[inliers]
             max_inliers = inliers
 
     return correctC, correctR, correctX
