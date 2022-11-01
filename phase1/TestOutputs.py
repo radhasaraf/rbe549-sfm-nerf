@@ -4,6 +4,7 @@ from utils.visualization_utils import *
 from utils.data_utils import *
 from EstimateFundamentalMatrix import *
 from GetInlierRANSAC import *
+from matplotlib import pyplot as plt
 
 def show_sample_matches_epipolars(imgs, feat_matches_D):
     key = (1,2)
@@ -40,3 +41,15 @@ def show_before_after_RANSAC(imgs, feat_matches_D, corrected_feat_matches_D):
     show_matches2(img1, img2,[v1, v2], f"before_RANSAC_{key}")
     show_matches2(img1, img2,[v1_corrected, v2_corrected], f"after_RANSAC_{key}")
     
+def show_disambiguated_and_corrected_poses(Xs_all_poses, X_linear, X_non_linear):
+    plt.figure(1)
+    colors = ['red','brown','greenyellow','teal']
+    for color, X_c in zip(colors, Xs_all_poses):
+        plt.scatter(X_c[:,0],X_c[:,2],color=color,marker='.')
+
+    plt.figure(2)
+    plt.scatter(X_linear[:, 0], X_linear[:, 2], color='skyblue', marker='.')
+
+    plt.figure(3)
+    plt.scatter(X_non_linear[:, 0], X_non_linear[:, 2], color='red', marker='x')
+
