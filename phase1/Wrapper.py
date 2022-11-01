@@ -11,7 +11,7 @@ from LinearTriangulation import *
 from DisambiguateCameraPose import *
 from NonlinearTriangulation import refine_triangulated_coords
 
-from TestOutputs import *
+from ShowOutputs import *
 
 def main(args):
     base_path = args.basePath
