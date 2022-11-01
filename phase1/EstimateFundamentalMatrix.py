@@ -26,7 +26,7 @@ def estimate_fundamental_matrix(v1, v2):
             [f[1],f[4],f[7]],
             [f[2],f[5],f[8]]
         ])
-    F = F/f[8]
+    #F = F/f[8]
 
     # take SVD of F
     UF, sigmaF, VF = np.linalg.svd(F)
@@ -35,3 +35,54 @@ def estimate_fundamental_matrix(v1, v2):
     reestimatedF = reestimatedF/reestimatedF[2,2]
 
     return F, reestimatedF
+
+def get_ij_fundamental_matrix(i,j,D):
+    """
+    input:
+        i  - first image index
+        j  - second image index
+        D  - data structure with {i,j} <- [v1,v2]
+    output:
+        F - fundamental matrix 3 x 3
+        epipoles - List[2, 2,]
+    """
+    key = (i,j)
+    v1, v2 = D[key]
+    _, F = estimate_fundamental_matrix(v1,v2)
+
+    return F
+
+def get_epipoles(F, homogenous=False):
+    """
+    input:
+        F - fundamental matrix or essential matrix 3 x 3
+            based on F or E epipoles convention changes
+    output:
+        epipoles - List[2, 2,]
+    """
+    U,sigma,V = np.linalg.svd(F)
+    e1 = V[2,:] # 3,
+    e1 = e1/e1[2]
+
+    e2 = U[:,2] # 3,
+    e2 = e2/e2[2]
+
+    if not homogenous:
+        e1 = e1[0:2]
+        e2 = e2[0:2]
+
+    return e1, e2
+
+def get_epipolars(F, v1, v2):
+    """
+    input:
+        F - fundamental matrix 3 x 3
+        v1 - N x 3
+        v2 - N x 3
+    output:
+        epipolars - List[2, 3 x N]
+    """
+    lines1 = F.T @ v2.T # (3 x 3 @ 3 x N) = 3 x N
+    lines2 = F @ v1.T # (3 x 3 @ 3 x N) = 3 x N
+    return lines1, lines2
+

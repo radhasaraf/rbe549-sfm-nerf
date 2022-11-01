@@ -7,21 +7,6 @@ import numpy as np
 import pprint
 
 
-def homogenize_coords(coords):
-    """
-    N x 2 -> N x 3
-    """
-    ret = np.concatenate((coords,np.ones((coords.shape[0],1))),axis=1)
-    return ret
-
-def unhomogenize_coords(coords):
-    """
-    Nx3 -> Nx2
-    """
-    ret = np.delete(coords, 2, axis=1)
-    return ret
-    
-
 def load_images(path, extn = ".png"):
     """
     input:
@@ -31,8 +16,13 @@ def load_images(path, extn = ".png"):
         images - list of images - N
     """
     img_files = glob.glob(f"{path}/*{extn}",recursive=False)
-    img_names = [img_file.replace(f"{path}",'').replace(f"{extn}",'') for img_file in img_files]
-    imgs = {int(img_name) : cv2.imread(img_file) for img_file,img_name in zip(img_files,img_names)}
+
+    img_names = []
+    for img_file in img_files:
+        img_name = img_file.rsplit(".", 1)[0][-1]
+        img_names.append(img_name)
+
+    imgs = {int(img_name) : cv2.imread(img_file) for img_file, img_name in zip(img_files,img_names)}
     return imgs, img_names
 
 def load_camera_intrinsics(path: str) -> List[List]:
@@ -50,6 +40,7 @@ def load_camera_intrinsics(path: str) -> List[List]:
         reader = csv.reader(file, delimiter=' ')
         for row in reader:
             K.append([float(row[i]) for i in range(3)])
+    K = np.array(K)
     return K
 
 def load_and_get_feature_matches(path):
