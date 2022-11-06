@@ -13,6 +13,24 @@ from NonlinearTriangulation import refine_triangulated_coords
 
 from ShowOutputs import *
 
+from utils.helpers import homogenize_coords, unhomogenize_coords
+def get_world_points(D, i, R, C, K):
+    """
+    inputs:
+        D - data structure
+        i - index on for which we need to get world correspondences, starts with 1
+        R - List[i-1; 3 x 3] list of rotation matrices 
+        C - List[i-1; 3 x 1] list of camera poses 
+    outputs:
+        v - N x 2 - features N x 2
+        X - N x 3 - world points on image N x 3
+    """
+    for j in range(1,i):
+        v1, v2 = D[(j,i)]  # N x 2, N x 2
+        x = homogenize_coords(v1).T # 3 x N
+        X = np.linalg.inv(K) @ x # 3 x 3 @ 3 x N
+        # TODO need to figure out the math to add and subtract rotation and camera pose here
+
 def main(args):
     base_path = args.basePath
     input_extn = ".png"
@@ -69,6 +87,11 @@ def main(args):
         show_disambiguated_and_corrected_poses(Xs_all_poses, X_linear, X_non_linear)
 
     ## camera registration
+    # for 3rd view I need points, some of the points will be between 1 and 3
+    # while some other points will be between 2 and 3
+    # but I know the camera pose of 1 and 2 so I can get the feature correspondences of 3 from 2D<>3D
+    # how do I prepare the data for this? 
+    # get_world_points
     # perform LinearPnP
     # optimize using NonLinearPnP
     # new 3D points using Linear Triangulation
