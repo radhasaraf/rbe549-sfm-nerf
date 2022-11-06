@@ -1,16 +1,22 @@
+import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import numpy as np
 import argparse
 import json
-from utils.utils import NeRFDatasetLoader
+from matplotlib import pyplot as plt
+
 from torch.utils.data import DataLoader
-import matplotlib.pyplot as plt
+
+from utils.NeRFDatasetLoader import NeRFDatasetLoader
 
 def main(args):
     lego_dataset = NeRFDatasetLoader(args.datasetPath, "val")
-    dataloader = DataLoader(lego_dataset, batch_size = 4, shuffle=True, num_workers=0)
+    data  = lego_dataset[2]
+    print(data["focal_length"]) #TODO need to verify
+    #dataloader = DataLoader(lego_dataset, batch_size = 4, shuffle=True, num_workers=0)
 
-    for i_batch, sample_batched in enumerate(dataloader):
-        print(i_batch, sample_batched['image'].size(), sample_batched['transforms'].size())
+#    for i_batch, sample_batched in enumerate(dataloader):
+#        print(i_batch, sample_batched['image'].size(), sample_batched['transforms'].size())
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
