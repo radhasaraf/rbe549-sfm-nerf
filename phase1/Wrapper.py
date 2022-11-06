@@ -13,9 +13,13 @@ from NonlinearTriangulation import refine_triangulated_coords
 
 from ShowOutputs import *
 
-from utils.helpers import homogenize_coords, unhomogenize_coords
-def get_world_points(D, i, R, C, K):
+from utils.helpers import homogenize_coords
+
+def get_2d_to_3d_correspondences(D, i, R, C, K):
     """
+    Returns the image and world points for the ith image based on matches and
+    prior camera poses.
+
     inputs:
         D - data structure
         i - index on for which we need to get world correspondences, starts with 1
@@ -25,11 +29,20 @@ def get_world_points(D, i, R, C, K):
         v - N x 2 - features N x 2
         X - N x 3 - world points on image N x 3
     """
+    image_points, world_points = [], []
+
     for j in range(1,i):
-        v1, v2 = D[(j,i)]  # N x 2, N x 2
-        x = homogenize_coords(v1).T # 3 x N
-        X = np.linalg.inv(K) @ x # 3 x 3 @ 3 x N
-        # TODO need to figure out the math to add and subtract rotation and camera pose here
+        vj, vi = D[(j,i)]  # N x 2, N x 2
+        vj = homogenize_coords(vj).T  # 3 x N
+        xj = np.linalg.inv(K) @ vj  # 3 x 3 @ 3 x N
+        X = R.T @ xj + C  # 3 x N
+        world_points.append(X.T)  # List(N x 3)
+        image_points.append(vi)
+
+    image_points = np.vstack(image_points)
+    world_points = np.vstack(world_points)
+
+    return image_points, world_points
 
 def main(args):
     base_path = args.basePath
@@ -80,18 +93,14 @@ def main(args):
     # disambiguate the poses using chierality condition
     C, R, X_linear = disambiguate_camera_poses(Cs, Rs, Xs_all_poses)
 
-    # perform non linear triangulation
+    # perform non-linear triangulation
     X_non_linear = refine_triangulated_coords(K, np.zeros(3), np.eye(3), C, R, v1, v2, X_linear)
 
     if args.display:
         show_disambiguated_and_corrected_poses(Xs_all_poses, X_linear, X_non_linear)
 
     ## camera registration
-    # for 3rd view I need points, some of the points will be between 1 and 3
-    # while some other points will be between 2 and 3
-    # but I know the camera pose of 1 and 2 so I can get the feature correspondences of 3 from 2D<>3D
-    # how do I prepare the data for this? 
-    # get_world_points
+
     # perform LinearPnP
     # optimize using NonLinearPnP
     # new 3D points using Linear Triangulation

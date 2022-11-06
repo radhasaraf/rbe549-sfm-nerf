@@ -11,7 +11,8 @@ def extract_camera_pose(E):
     input:
         E - 3 x 3
     output:
-        C, R - List[4 ; 3 x 1, 3 x 3]
+        C - List[4 ; 3 x 1] Translation of camera wrt world origin
+        R - List[4 ; 3 x 3] Rotation of origin wrt camera
     """
     # SVD of E
     UE, sigmaE, VE = np.linalg.svd(E)
