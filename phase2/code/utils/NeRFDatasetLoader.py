@@ -52,9 +52,29 @@ class NeRFDatasetLoader(Dataset):
         image = io.imread(img_name)
         transforms = self.data["frames"][idx]["transform_matrix"]
         transforms = torch.tensor(transforms)
-        
+        return {'image': image, 'transforms': transforms}
+
+    def get_focal_length(self):
         # https://github.com/NVlabs/instant-ngp/issues/332
         camera_angle_x = self.data["camera_angle_x"]
         focal_length = 0.5*image.shape[0] / math.tan(0.5 * camera_angle_x) # TODO need to verify math
+        return focal_length
+    
+    def get_full_data(self):
+        """
+        inputs:
+            path
+        outputs:
+            focal_length - 1,
+            transformations - List[N; 4 x 4]
+            images - List[N; W x H]
+        """
+        transforms = []
+        images = []
+        focal_length = get_focal_length()
+        for i in range(len(self.data["frames"])):
+            data = self.data[i]
+            transforms.append(data["transforms"])
+            images.append(data["image"])
 
-        return {"focal_length": focal_length, 'image': image, 'transforms': transforms}
+        return focal_length, transforms, images
