@@ -17,6 +17,13 @@ def main(args):
 
 #    for i_batch, sample_batched in enumerate(dataloader):
 #        print(i_batch, sample_batched['image'].size(), sample_batched['transforms'].size())
+    # loop over the camera views
+    # for each view get the estimated RGB image
+    # if it is in Train:
+    #   compare the photometric loss
+    #   backpropagate
+    # if it is not in Train:
+    #   get the RGB image
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
