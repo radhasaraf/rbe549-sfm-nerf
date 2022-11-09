@@ -6,6 +6,7 @@ import json
 from matplotlib import pyplot as plt
 import torch
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 from utils.NeRFDatasetLoader import NeRFDatasetLoader
 from utils.NeRF import NeRF
 import cv2
@@ -30,29 +31,35 @@ def encode_positions(x, n_dim=8):
         y - (H*W) x (3*n_dim)
     """
     positions = [x]
-    print(len(positions))
+    #TODO it's crashing here if the image size is 800 x 800
     for i in range(n_dim):
         for fn in [torch.sin, torch.cos]:
             positions.append(fn(2.0**i *x))
-        print(i)
-    print("came out of for loop")
-    return tf.concat(positions, axis=-1)
+    return torch.concat(positions, axis=-1)
 
-def volumetric_rendering(raw, ts, s):
+def volumetric_rendering(raw, ts, ray_directions):
     """
     takes raw outputs from network and returns image
     inputs:
-        rgbs - n_rays x n_ray_points x 4
+        raw - n_rays x n_ray_points x 4
+        s - 
         ts - N, -  parameter t along z axis 
     outputs:
         image -  H x W viewed along that direction
     """
     rgb = torch.sigmoid(raw[..., :3])  # n_rays x n_ray_points x 3
-    delta_ts = ts[..., 1:] - ts[..., :-1] # n_ray_points-1,
-    sigma = rgbs[...,0]  # n_rays x n_ray_points x 1
 
-    raw2alpha = lambda raw, dists, act_fn=F.relu: 1.-torch.exp(-act_fn(raw)*dists)
-    alpha = raw2alpha(raw[...,3] + noise, dists)  # [N_rays, N_samples]
+    delta_ts = ts[..., 1:] - ts[..., :-1] # n_ray_points-1,
+    delta_ts = torch.cat([delta_ts, torch.Tensor([1e10]).expand(delta_ts[...,:1].shape)], -1)  # [N_rays, N_samples]
+
+    delta_ts = delta_ts * torch.norm(ray_directions[...,None,:], dim=-1)
+    print(delta_ts.shape)
+    print(raw.shape)
+
+    raw2alpha = lambda raw, delta_ts, act_fn=F.relu: 1.-torch.exp(-act_fn(raw)*delta_ts)
+    alpha = raw2alpha(raw[...,3], delta_ts)  # [N_rays, N_samples]
+    print(alpha.shape)
+    exit(1)
     weights = alpha * torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)), 1.-alpha + 1e-10], -1), -1)[:, :-1]
     rgb_map = torch.sum(weights[...,None] * rgb, -2)  # [N_rays, 3]
     return rgb_map
@@ -114,12 +121,9 @@ def generate_ray_points(ray_directions, ray_origins, N_samples, t_near=0, t_far=
     # TODO need to consider N_rand_rays case
     ts = torch.linspace(t_near, t_far, N_samples)  # N, 
     rays = ray_origins[..., None, :] + ray_directions[..., None, :]*ts[..., None]  # H x W x N x 3 #TODO how is this working? 
-    print(f"rays_origin:{ray_origins.shape}")
-    print(f"rays_dirs:{ray_directions.shape}")
-    print(f"rays:{rays.shape}")
     points = rays.reshape((-1,3))
+    #points = encode_positions(points)
     print(f"points:{points.shape}")
-    points = encode_positions(points)
     return points, ts
 
 def test(args):
@@ -144,15 +148,14 @@ def train(args):
             T = transform[:3,3]
             ray_dirs, ray_origins = get_rays(H, W, f, R, T)  # H x W x 3
             ray_points, ts = generate_ray_points(ray_dirs, ray_origins, args.n_ray_points)  # n_rays x n_ray_points x 3
-            print(ray_points.shape)
             ray_points = ray_points.to(device)
+
+            print(f"ray_points_shape:{ray_points.shape}")
             rgbs = model(ray_points)  # n_rays x n_ray_points x 3
-            rgb = rgbs[...,:3].reshape((H, W))  # n_rays x n_ray_points x 3
-            s = rgbs[...,3] # n_rays x n_ray_points x 1
+            rgbs = rgbs.reshape((H*W, args.n_ray_points, 4))  # n_rays x n_ray_points x 3
 
-
-            train_image = volumetric_rendering(rgb, s)  #TODO
-            loss_this_iter = photometric_loss(gt_image, train_image)  #TODO
+            train_image = volumetric_rendering(rgbs, ts, ray_dirs)
+            loss_this_iter = photometric_loss(gt_image, train_image)
 
             optimizer.zero_grad()
             loss_this_iter.backward()

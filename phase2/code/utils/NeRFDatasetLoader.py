@@ -54,6 +54,8 @@ class NeRFDatasetLoader(Dataset):
         img_name = os.path.join(self.root_dir + os.sep + img_file)
         image = cv2.imread(img_name)
 
+        image = cv2.resize(image, (200,200), interpolation=cv2.INTER_AREA)
+
         # get transforms of that image
         transforms = self.data["frames"][idx]["transform_matrix"]
         transforms = torch.tensor(transforms)
