@@ -7,6 +7,55 @@ from matplotlib import pyplot as plt
 import torch
 from torch.utils.data import DataLoader
 from utils.NeRFDatasetLoader import NeRFDatasetLoader
+from utils.NeRF import NeRF
+import cv2
+
+def get_device():
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    else:
+        return torch.device("cpu")
+    return device
+
+device = get_device()
+print(f"Running on device: {device}")
+
+def encode_positions(x, n_dim=8):
+    """
+    Encodes positions into higher dimension
+    inputs:
+        x - (H*W) x 3
+        n_dim - 1, - number of dimensions it has to encode
+    outpus:
+        y - (H*W) x (3*n_dim)
+    """
+    positions = [x]
+    print(len(positions))
+    for i in range(n_dim):
+        for fn in [torch.sin, torch.cos]:
+            positions.append(fn(2.0**i *x))
+        print(i)
+    print("came out of for loop")
+    return tf.concat(positions, axis=-1)
+
+def volumetric_rendering(raw, ts, s):
+    """
+    takes raw outputs from network and returns image
+    inputs:
+        rgbs - n_rays x n_ray_points x 4
+        ts - N, -  parameter t along z axis 
+    outputs:
+        image -  H x W viewed along that direction
+    """
+    rgb = torch.sigmoid(raw[..., :3])  # n_rays x n_ray_points x 3
+    delta_ts = ts[..., 1:] - ts[..., :-1] # n_ray_points-1,
+    sigma = rgbs[...,0]  # n_rays x n_ray_points x 1
+
+    raw2alpha = lambda raw, dists, act_fn=F.relu: 1.-torch.exp(-act_fn(raw)*dists)
+    alpha = raw2alpha(raw[...,3] + noise, dists)  # [N_rays, N_samples]
+    weights = alpha * torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)), 1.-alpha + 1e-10], -1), -1)[:, :-1]
+    rgb_map = torch.sum(weights[...,None] * rgb, -2)  # [N_rays, 3]
+    return rgb_map
 
 def get_rays(H, W, f, R, T):
     """
@@ -45,7 +94,7 @@ def get_rays(H, W, f, R, T):
     ray_directions = ray_directions[..., None, :]  # H x W x 1 x 3
     ray_directions = ray_directions*R  # H x W x 3 x 3 = H x W x 1 x 3 * 3 x 3
     ray_directions = torch.sum(ray_directions, -1) # H x W x 3
-    ray_origins = torch.broadcast_to(T, torch.shape(ray_directions)) # H x W x 3
+    ray_origins = torch.broadcast_to(T, ray_directions.shape) # H x W x 3
     return ray_directions, ray_origins
 
 def generate_ray_points(ray_directions, ray_origins, N_samples, t_near=0, t_far=1, N_rand_rays=None):
@@ -64,35 +113,46 @@ def generate_ray_points(ray_directions, ray_origins, N_samples, t_near=0, t_far=
     """
     # TODO need to consider N_rand_rays case
     ts = torch.linspace(t_near, t_far, N_samples)  # N, 
-    rays = ray_origins[..., None, :] + ray_directions[..., None, :]*ts[..., None]  # H x W x 1 x 3 #TODO how is this working? 
+    rays = ray_origins[..., None, :] + ray_directions[..., None, :]*ts[..., None]  # H x W x N x 3 #TODO how is this working? 
+    print(f"rays_origin:{ray_origins.shape}")
+    print(f"rays_dirs:{ray_directions.shape}")
+    print(f"rays:{rays.shape}")
     points = rays.reshape((-1,3))
-    #points = encode_position(points)
+    print(f"points:{points.shape}")
+    points = encode_positions(points)
     return points, ts
 
 def test(args):
     pass
 
+def photometric_loss(gt_image, train_image):
+    img2mse = lambda x, y : torch.mean((x - y) ** 2)
+    img_loss = torch.mean((rgb - target_s)**2)
+    return img_loss
+
 def train(args):
-    lego_dataset = NeRFDatasetLoader(args.path)
+    lego_dataset = NeRFDatasetLoader(args.dataset_path, args.mode)
     f, transforms, images = lego_dataset.get_full_data()
     model = NeRF().to(device)
-    optimizer = torch.optim.Adam(params=grad_vars, lr=args.lrate, betas=(0.9, 0.999))
-
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lrate, betas=(0.9, 0.999))
 
     model.train()
     for i_iter in range(args.max_iters):
         for transform, gt_image in zip(transforms, images):
-            H, W = gt_image.shape
+            H, W, _ = gt_image.shape
             R = transform[:3,:3]
-            T = transform[:,3]
+            T = transform[:3,3]
             ray_dirs, ray_origins = get_rays(H, W, f, R, T)  # H x W x 3
-            ray_points, ts = generate_ray_points(ray_dirs, ray_origins, args.n_ray_points)  # H x W x 3
-            rgbs = model(ray_points)  # H*W x 4
-            rgb = rgbs[:,:3].reshape((H, W))  # H x W x 3
-            s = rgbs[:,3]
+            ray_points, ts = generate_ray_points(ray_dirs, ray_origins, args.n_ray_points)  # n_rays x n_ray_points x 3
+            print(ray_points.shape)
+            ray_points = ray_points.to(device)
+            rgbs = model(ray_points)  # n_rays x n_ray_points x 3
+            rgb = rgbs[...,:3].reshape((H, W))  # n_rays x n_ray_points x 3
+            s = rgbs[...,3] # n_rays x n_ray_points x 1
 
-            train_image = volumetric_rendering(rgb, s)
-            loss_this_iter = loss(gt_image, train_image)
+
+            train_image = volumetric_rendering(rgb, s)  #TODO
+            loss_this_iter = photometric_loss(gt_image, train_image)  #TODO
 
             optimizer.zero_grad()
             loss_this_iter.backward()
@@ -107,23 +167,29 @@ def train(args):
             for param_group in optimizer.param_groups:
                 param_group['lr'] = new_lrate
 
+    print("training is done!")
+
 
 
 def main(args):
-
-    # loop over the camera views
-    # for each view get the estimated RGB image
-    # if it is in Train:
-    #   compare the photometric loss
-    #   backpropagate
-    # if it is not in Train:
-    #   get the RGB image
+    if args.mode == "train":
+        train(args)
+    elif args.mode == "test":
+        test(args)
+    else:
+        print("need to give some argument!")
+    return
 
 def configParser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--display',action='store_true',help="to display images")
     parser.add_argument('--debug',action='store_true',help="to display debug information")
-    parser.add_argument('--datasetPath',default='../data/lego/',help="dataset path")
+    parser.add_argument('--dataset_path',default='../data/lego/',help="dataset path")
+    parser.add_argument('--mode',default=False,help="to train/test/val")
+    parser.add_argument('--lrate',default=5e-4,help="training learning rate")
+    parser.add_argument('--lrate_decay',default=25,help="training learning rate")
+    parser.add_argument('--n_ray_points',default=64,help="training learning rate")
+    parser.add_argument('--max_iters',default=20000,help="training learning rate")
     return parser
 
 if __name__ == "__main__":
