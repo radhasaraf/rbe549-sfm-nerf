@@ -67,7 +67,7 @@ class NeRFDatasetLoader(Dataset):
 
         return {'focal_length': focal_length, 'image': image, 'transforms': transforms}
 
-    def get_full_data(self):
+    def get_full_data(self, device):
         """
         inputs:
             path
@@ -81,7 +81,7 @@ class NeRFDatasetLoader(Dataset):
         focal_length = self[0]['focal_length']
         for i in range(len(self.data["frames"])):
             data = self[i]
-            transforms.append(data["transforms"])
-            images.append(data["image"])
+            transforms.append(torch.tensor(data["transforms"]))
+            images.append(torch.tensor(data["image"]))
 
-        return focal_length, transforms, images
+        return torch.tensor(focal_length).to(device), torch.stack(transforms).to(device), torch.stack(images).to(device)
