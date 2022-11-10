@@ -11,6 +11,7 @@ from utils.NeRFDatasetLoader import NeRFDatasetLoader
 from utils.NeRF import NeRF
 import cv2
 from tqdm import tqdm
+import random
 
 def get_device():
     if torch.cuda.is_available():
@@ -66,7 +67,6 @@ def volumetric_rendering(raw, ts, ray_directions):
     weights = alpha * torch.cumprod(t1, -1)[:, :-1]
     weights = weights.to(device)
     rgb_map = torch.sum(weights[...,None] * rgb, -2)  # [N_rays, 3]
-    rgb_map = rgb_map.reshape((200,200,-1))
     return rgb_map
 
 def get_rays(image, f, R, T):
@@ -109,13 +109,36 @@ def get_rays(image, f, R, T):
     ray_origins = torch.broadcast_to(T, ray_directions.shape) # H x W x 3
     return ray_directions, ray_origins
 
+# def generate_ray_points(ray_directions, ray_origins, n_samples, t_near=0, t_far=1, N_rand_rays=None, n_frequencies=4):
+#     """
+#     r = o + t*d 
+#     building r here
+#     inputs:
+#         ray_directions - H x W x 3
+#         ray_origins  - H x W x 3
+#         n_samples
+#         t_near
+#         t_far
+#         N_rand_rays - None
+#     outputs
+#         ray_points - H*W*n_samples x 3
+#         ts - samples
+#     """
+#     # TODO need to consider N_rand_rays case
+#     ts = torch.linspace(t_near, t_far, n_samples).to(device)  # N, 
+#     rays = ray_origins[..., None, :] + ray_directions[..., None, :]*ts[..., None]  # H x W x n_samples x 3 
+#     points = rays.reshape((-1,3))  # (H*W*n_samples) x 3
+#     points = encode_positions(points, n_frequencies)  # (H*W*n_samples) x (3*4)
+#     return points, ts
+
+
 def generate_ray_points(ray_directions, ray_origins, n_samples, t_near=0, t_far=1, N_rand_rays=None, n_frequencies=4):
     """
     r = o + t*d 
     building r here
     inputs:
-        ray_directions - H x W x 3
-        ray_origins  - H x W x 3
+        ray_directions - (H*W) x 3
+        ray_origins  - (H*W) x 3
         n_samples
         t_near
         t_far
@@ -126,7 +149,7 @@ def generate_ray_points(ray_directions, ray_origins, n_samples, t_near=0, t_far=
     """
     # TODO need to consider N_rand_rays case
     ts = torch.linspace(t_near, t_far, n_samples).to(device)  # N, 
-    rays = ray_origins[..., None, :] + ray_directions[..., None, :]*ts[..., None]  # H x W x n_samples x 3 
+    rays = ray_origins[..., None, :] + ray_directions[..., None, :]*ts[..., None]  # (H*W) x n_samples x 3 
     points = rays.reshape((-1,3))  # (H*W*n_samples) x 3
     points = encode_positions(points, n_frequencies)  # (H*W*n_samples) x (3*4)
     return points, ts
@@ -163,15 +186,21 @@ def train(args):
             R = transform[:3,:3]
             T = transform[:3,3]
             ray_dirs, ray_origins = get_rays(gt_image, f, R, T)  # H x W x 3
-            ray_points, ts = generate_ray_points(ray_dirs, ray_origins, args.n_ray_points, n_frequencies=args.n_pose_frequencies)  # n_rays x n_ray_points x 3
+            ray_dirs = ray_dirs.reshape((-1,3))
+            ray_origins = ray_origins.reshape((-1,3))
+
+            n_ray_samples = random.sample(range(ray_dirs.shape[0]), args.n_rays)  # args.n_rays samples
+
+            ray_points, ts = generate_ray_points(ray_dirs[n_ray_samples], ray_origins[n_ray_samples], args.n_ray_points, n_frequencies=args.n_pose_frequencies)  # n_rays x n_ray_points x 3
             ray_points = ray_points.cuda()
             ts = ts
 
             rgbs = model(ray_points)  # n_rays x n_ray_points x 3
-            rgbs = rgbs.reshape((H*W, args.n_ray_points, 4))  # n_rays x n_ray_points x 3
+            rgbs = rgbs.reshape((args.n_rays, args.n_ray_points, 4))  # n_rays x n_ray_points x 3
 
-            train_image = volumetric_rendering(rgbs, ts, ray_dirs)
-            loss_this_iter = photometric_loss(gt_image, train_image)
+            train_image_values = volumetric_rendering(rgbs, ts, ray_dirs)
+            gt_image_values = gt_image.reshape((-1,3))
+            loss_this_iter = photometric_loss(gt_image_values[args.n_rays], train_image_values)
 
             optimizer.zero_grad()
             loss_this_iter.backward()
@@ -209,6 +238,7 @@ def configParser():
     parser.add_argument('--lrate_decay',default=25,help="decay learning rate")
     parser.add_argument('--n_ray_points',default=32,help="number of samples on a ray")
     parser.add_argument('--n_pose_frequencies',default=2,help="number of positional encoding frequencies for position")
+    parser.add_argument('--n_rays',default=2,help="number of rays to consider in an image")
     parser.add_argument('--max_iters',default=20000,help="number of max iterations for training")
     return parser
 
