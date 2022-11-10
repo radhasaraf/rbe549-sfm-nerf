@@ -9,7 +9,7 @@ random.seed(42)
 def get_inliers_RANSAC(v1,v2,max_iterations,threshold):
     """
     input:
-        v1, v2 - non homogenous image feature coordinates
+        v1, v2 - non-homogenous image feature coordinates
                  N x 2
         max_iterations - number of iterations it should run ransac for
         threshold - error threshold

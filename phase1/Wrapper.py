@@ -13,6 +13,37 @@ from NonlinearTriangulation import refine_triangulated_coords
 
 from ShowOutputs import *
 
+from utils.helpers import homogenize_coords
+
+def get_2d_to_3d_correspondences(D, i, R, C, K):
+    """
+    Returns the image and world points for the ith image based on matches and
+    prior camera poses.
+
+    inputs:
+        D - data structure
+        i - index on for which we need to get world correspondences, starts with 1
+        R - List[i-1; 3 x 3] list of rotation matrices 
+        C - List[i-1; 3 x 1] list of camera poses 
+    outputs:
+        v - N x 2 - features N x 2
+        X - N x 3 - world points on image N x 3
+    """
+    image_points, world_points = [], []
+
+    for j in range(1,i):
+        vj, vi = D[(j,i)]  # N x 2, N x 2
+        vj = homogenize_coords(vj).T  # 3 x N
+        xj = np.linalg.inv(K) @ vj  # 3 x 3 @ 3 x N
+        X = R.T @ xj + C  # 3 x N
+        world_points.append(X.T)  # List(N x 3)
+        image_points.append(vi)
+
+    image_points = np.vstack(image_points)
+    world_points = np.vstack(world_points)
+
+    return image_points, world_points
+
 def main(args):
     base_path = args.basePath
     input_extn = ".png"
@@ -62,13 +93,14 @@ def main(args):
     # disambiguate the poses using chierality condition
     C, R, X_linear = disambiguate_camera_poses(Cs, Rs, Xs_all_poses)
 
-    # perform non linear triangulation
+    # perform non-linear triangulation
     X_non_linear = refine_triangulated_coords(K, np.zeros(3), np.eye(3), C, R, v1, v2, X_linear)
 
     if args.display:
         show_disambiguated_and_corrected_poses(Xs_all_poses, X_linear, X_non_linear)
 
     ## camera registration
+
     # perform LinearPnP
     # optimize using NonLinearPnP
     # new 3D points using Linear Triangulation

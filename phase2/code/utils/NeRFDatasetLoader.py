@@ -6,6 +6,7 @@ import torch
 import math
 from torch.utils.data import Dataset
 from skimage import io
+import cv2
 
 class NeRFDatasetLoader(Dataset):
     """
@@ -47,14 +48,40 @@ class NeRFDatasetLoader(Dataset):
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
+
+        # get image
         img_file = self.data["frames"][idx]["file_path"] + ".png"
         img_name = os.path.join(self.root_dir + os.sep + img_file)
-        image = io.imread(img_name)
+        image = cv2.imread(img_name)
+
+        image = cv2.resize(image, (200,200), interpolation=cv2.INTER_AREA)
+
+        # get transforms of that image
         transforms = self.data["frames"][idx]["transform_matrix"]
         transforms = torch.tensor(transforms)
-        
+
+        # get focal length
         # https://github.com/NVlabs/instant-ngp/issues/332
         camera_angle_x = self.data["camera_angle_x"]
         focal_length = 0.5*image.shape[0] / math.tan(0.5 * camera_angle_x) # TODO need to verify math
 
-        return {"focal_length": focal_length, 'image': image, 'transforms': transforms}
+        return {'focal_length': focal_length, 'image': image, 'transforms': transforms}
+
+    def get_full_data(self, device):
+        """
+        inputs:
+            path
+        outputs:
+            focal_length - 1,
+            transformations - List[N; 4 x 4]
+            images - List[N; W x H]
+        """
+        transforms = []
+        images = []
+        focal_length = self[0]['focal_length']
+        for i in range(len(self.data["frames"])):
+            data = self[i]
+            transforms.append(torch.tensor(data["transforms"]))
+            images.append(torch.tensor(data["image"]))
+
+        return torch.tensor(focal_length).to(device), torch.stack(transforms).to(device), torch.stack(images).to(device)
