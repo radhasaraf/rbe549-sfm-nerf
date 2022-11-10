@@ -1,0 +1,11 @@
+TODOs
+- [*] take random rays
+- [ ] add tensorboard
+- [ ] add visualization step
+- [ ] randomness in sampling points
+- [ ] paper is normalizing the position and directional encoding to [-1, 1]
+- [ ] add evaluation step
+- [ ] create a video
+- [ ] heirarchial sampling -- involves fine network
+- [ ] viewing directions in the network
+- [ ] add noise to the raw density outputs in volume rendering
