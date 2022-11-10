@@ -1,0 +1,4 @@
+TODOs
+- [ ] take random rays
+- [ ] viewing directions in the network
+- [ ] add noise to the raw density outputs in volume rendering
