@@ -22,20 +22,20 @@ def get_device():
 device = get_device()
 print(f"Running on device: {device}")
 
-def encode_positions(x, n_dim=8):
+def encode_positions(x, n_dim=4):
     """
     Encodes positions into higher dimension
     inputs:
-        x - (H*W) x 3
+        x - (H*W*n_samples) x 3
         n_dim - 1, - number of dimensions it has to encode
     outpus:
-        y - (H*W) x (3*n_dim)
+        y - (H*W*n_samples) x (3*n_dim)
     """
-    positions = [x]
+    positions = []
     #TODO it's crashing here if the image size is 800 x 800
     for i in range(n_dim):
         for fn in [torch.sin, torch.cos]:
-            positions.append(fn(2.0**i *x))
+            positions.append(fn((2.0**i)*x))
     return torch.concat(positions, axis=-1)
 
 def volumetric_rendering(raw, ts, ray_directions):
@@ -124,9 +124,9 @@ def generate_ray_points(ray_directions, ray_origins, N_samples, t_near=0, t_far=
     """
     # TODO need to consider N_rand_rays case
     ts = torch.linspace(t_near, t_far, N_samples).to(device)  # N, 
-    rays = ray_origins[..., None, :] + ray_directions[..., None, :]*ts[..., None]  # H x W x N x 3 #TODO how is this working? 
-    points = rays.reshape((-1,3))
-    #points = encode_positions(points)
+    rays = ray_origins[..., None, :] + ray_directions[..., None, :]*ts[..., None]  # H x W x n_samples x 3 
+    points = rays.reshape((-1,3))  # (H*W*n_samples) x 3
+    points = encode_positions(points, 4)  # (H*W*n_samples) x (3*4)
     return points, ts
 
 def test(args):
