@@ -132,9 +132,6 @@ def generate_ray_points(ray_directions, ray_origins, n_ray_point_samples, t_near
     points = encode_positions(points, n_frequencies)  # (n_rays*n_samples) x (3*4)
     return points, ts
 
-def test(args):
-    pass
-
 def photometric_loss(gt_image, train_image):
     img2mse = lambda x, y : torch.mean((x - y) ** 2)
     img_loss = torch.mean((train_image - gt_image)**2)
@@ -147,9 +144,13 @@ def find_and_load_latest_model(model, args):
     
     latest_ckpt_file = max(files, key=os.path.getctime) if files else None
 
-    if (latest_ckpt_file is not None) and args.load_checkpoint:
+    if latest_ckpt_file and args.load_checkpoint:
+        print(latest_ckpt_file)
         latest_ckpt = torch.load(latest_ckpt_file)
-        start_iter = int(latest_ckpt_file.split('.')[0][-1])
+
+        start_iter = latest_ckpt_file.replace(args.checkpoint_path,'').replace('model_','').replace('.ckpt','')
+
+        start_iter = int(start_iter)
         
         model.load_state_dict(latest_ckpt['model_state_dict'])
         print(f"Loaded latest checkpoint from {latest_ckpt_file} ....")
@@ -157,6 +158,17 @@ def find_and_load_latest_model(model, args):
         print('New model initialized....')
     
     return start_iter
+
+
+def test(args):
+    lego_dataset = NeRFDatasetLoader(args.dataset_path, args.mode)
+    f, transforms, images = lego_dataset.get_full_data(device)
+    
+    # initialize the model
+    model = NeRF(input_channels).to(device)
+
+    pass
+
 
 def train(args):
     # setup tensorboard
@@ -180,6 +192,7 @@ def train(args):
 
     model.train()
     
+    print(f"starting iteration from: {start_iter}")
     for i_iter in tqdm(range(start_iter, args.max_iters)):
         
         loss_this_iter = 0
@@ -233,7 +246,7 @@ def train(args):
             writer.add_scalar('LossEveryView', loss_this_view, i_iter*transforms.shape[0] + ith_view)
             writer.flush()
         
-        print(f"loss_this_iter:{loss_this_iter}")
+        print(f"i_iter:{i_iter}, loss_this_iter:{loss_this_iter}")
         writer.add_scalar('LossEveryIter', loss_this_iter, i_iter)
         writer.flush()
 
@@ -241,7 +254,7 @@ def train(args):
         # Save checkpoint every some SaveCheckPoint's iterations
         if i_iter % args.save_ckpt_every_n_iters == 0:
             # Save the Model learnt in this epoch
-            checkpoint_save_name =  args.checkpoint_path + os.sep + str(i_iter) + 'model.ckpt'
+            checkpoint_save_name =  args.checkpoint_path + os.sep + 'model_' + str(i_iter) + '.ckpt'
             torch.save({'iter': i_iter,
                         'model_state_dict': model.state_dict(),
                         'optimizer_state_dict': optimizer.state_dict(),
@@ -281,6 +294,7 @@ def configParser():
     parser.add_argument('--max_iters',default=20000,help="number of max iterations for training")
     parser.add_argument('--logs_path',default="../logs/",help="logs path")
     parser.add_argument('--checkpoint_path',default="../checkpoints/",help="checkpoints path")
+    parser.add_argument('--load_checkpoint',default=False,help="whether to load checkpoint or not")
     parser.add_argument('--save_ckpt_every_n_iters',default=200,help="checkpoints path")
     return parser
 
