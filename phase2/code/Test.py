@@ -52,7 +52,8 @@ def volumetric_rendering(raw, ts, ray_directions):
         image -  H x W viewed along that direction
     """
     # rgb = torch.sigmoid(raw[..., :3])  # n_rays x n_ray_points x 3
-    rgb = raw[..., :3]  # n_rays x n_ray_points x 3
+    rgb = torch.sigmoid(raw[..., :3])  # n_rays x n_ray_points x 3
+    sigma_a = torch.relu(raw[..., 3])  # n_rays x n_ray_points x 1
 
     delta_ts = ts[..., 1:] - ts[..., :-1] # n_ray_points-1,
     t1 = torch.Tensor([1e10]).expand(delta_ts[...,:1].shape).to(device)
@@ -62,10 +63,17 @@ def volumetric_rendering(raw, ts, ray_directions):
     ray_directions_norm = torch.norm(ray_directions[..., None, :], dim =-1) # n_rays x 1 x 3
     delta_ts = delta_ts * ray_directions_norm  # n_rays x n_ray_points x 3
 
-    raw2alpha = lambda raw, delta_ts: 1.-torch.exp(-raw*delta_ts)
-    alpha = raw2alpha(raw[...,3], delta_ts)  # [N_rays, N_samples]
+    # alphas
+    alpha = 1 - torch.exp(-sigma_a*delta_ts)  # n_rays x n_ray_points x 1
+    
+    # get transmittance
+    exp = 1.-alpha + 1e-10
+
     t1 = torch.cat([torch.ones((alpha.shape[0], 1)).to(device), 1.-alpha + 1e-10], -1)
-    weights = alpha * torch.cumprod(t1, -1)[:, :-1]
+
+    transmittance = torch.cumprod(exp, axis = -1)
+
+    weights = alpha * transmittance
     weights = weights.to(device)
     rgb_map = torch.sum(weights[...,None] * rgb, -2)  # [N_rays, 3]
     return rgb_map
@@ -224,11 +232,11 @@ def train(args):
     writer = SummaryWriter(args.logs_path)
 
     lego_dataset = NeRFDatasetLoader(args.dataset_path, args.mode)
-    f, transforms, images = lego_dataset.get_full_data(device)
+    f, transforms, images = lego_dataset.get_tiny_data(device)
 
     # get input channels
     height, width, _ = images[0].shape
-    input_channels = 3*2*args.n_pose_frequencies
+    input_channels = 3*2*args.n_pose_frequencies + 3
 
     # initialize the model
     model = NeRF(input_channels, args.network_width).to(device)
@@ -298,7 +306,10 @@ def train(args):
             # transform1 = transforms[0]
             # image_values, _ = render(image1, transform1, f, model, True, args) # n_rays x 3
             # image = image_values.reshape(image1.shape)
-            # cv2.imwrite(f"../{args.images_folder}/image_{i_iter}.png", image.detach().cpu().numpy())
+            # # print("saving images")
+            # # cv2.imshow(f"{args.images_folder}/image_{i_iter}.png", image.detach().cpu().numpy())
+            # # cv2.waitKey(0)
+            # cv2.imwrite(f"{args.images_folder}/image_{i_iter}.png", image.detach().cpu().numpy())
             # model.train()
 
 
@@ -332,7 +343,7 @@ def configParser():
     parser.add_argument('--lrate',default=5e-4,help="training learning rate")
     parser.add_argument('--lrate_decay',default=25,help="decay learning rate")
     parser.add_argument('--n_ray_points',default=64,help="number of samples on a ray")
-    parser.add_argument('--n_pose_frequencies',default=2,help="number of positional encoding frequencies for position")
+    parser.add_argument('--n_pose_frequencies',default=16,help="number of positional encoding frequencies for position")
     parser.add_argument('--n_rays',default=32*32*8,help="number of rays to consider in an image")
     parser.add_argument('--max_iters',default=200000,help="number of max iterations for training")
     parser.add_argument('--logs_path',default="../logs/",help="logs path")

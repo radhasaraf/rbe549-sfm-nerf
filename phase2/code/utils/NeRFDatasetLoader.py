@@ -42,6 +42,8 @@ class NeRFDatasetLoader(Dataset):
         with open(transforms_path) as file:
             self.data = json.load(file)
 
+        self.tiny_data = np.load("tiny_nerf_data.npz")
+
     def __len__(self):
         return len(self.data["frames"])
 
@@ -85,3 +87,9 @@ class NeRFDatasetLoader(Dataset):
             images.append(torch.tensor(data["image"]))
 
         return torch.tensor(focal_length).to(device), torch.stack(transforms).to(device), torch.stack(images).to(device)
+
+    def get_tiny_data(self, device):
+        images = torch.tensor(self.tiny_data["images"]).to(device)
+        transforms = torch.tensor(self.tiny_data["poses"]).to(device)
+        focal = torch.tensor(self.tiny_data["focal"])
+        return focal, transforms, images

@@ -133,3 +133,4 @@ dmypy.json
 *tiny*
 *.ckpt
 *.tfevents*
+phase2/images_folder/
