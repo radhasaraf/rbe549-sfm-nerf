@@ -6,22 +6,22 @@ class NeRF(nn.Module):
     input layer will have 3 inputs 
     last but one layer will have additional 3 inputs
     """
-    def __init__(self, input_channels):
+    def __init__(self, input_channels, width):
         super().__init__()
-        self.lin1 = nn.Sequential(nn.Linear(input_channels,256), nn.ReLU())
-        self.lin2 = nn.Sequential(nn.Linear(256, 256), nn.ReLU())
-        self.lin3 = nn.Sequential(nn.Linear(256, 256), nn.ReLU())
-        self.lin4 = nn.Sequential(nn.Linear(256, 256), nn.ReLU())
-        self.lin5 = nn.Sequential(nn.Linear(256 + input_channels, 256), nn.ReLU())
-        self.lin6 = nn.Sequential(nn.Linear(256, 256), nn.ReLU())
-        self.lin7 = nn.Sequential(nn.Linear(256, 256), nn.ReLU())
-        self.lin8 = nn.Sequential(nn.Linear(256, 256), nn.ReLU())
-        self.lin9 = nn.Sequential(nn.Linear(256, 256), nn.ReLU())
+        self.lin1 = nn.Sequential(nn.Linear(input_channels + 3,width), nn.ReLU())
+        self.lin2 = nn.Sequential(nn.Linear(width, width), nn.ReLU())
+        self.lin3 = nn.Sequential(nn.Linear(width, width), nn.ReLU())
+        self.lin4 = nn.Sequential(nn.Linear(width, width), nn.ReLU())
+        self.lin5 = nn.Sequential(nn.Linear(width + input_channels + 3, width), nn.ReLU())
+        self.lin6 = nn.Sequential(nn.Linear(width, width), nn.ReLU())
+        self.lin7 = nn.Sequential(nn.Linear(width, width), nn.ReLU())
+        self.lin8 = nn.Sequential(nn.Linear(width, width), nn.ReLU())
+        self.lin9 = nn.Sequential(nn.Linear(width, width), nn.ReLU())
 
-        self.volume_density = nn.Sequential(nn.Linear(256,1), nn.ReLU())
+        self.volume_density = nn.Sequential(nn.Linear(width,1), nn.ReLU())
 
-        self.lin10 = nn.Sequential(nn.Linear(256,128), nn.ReLU())
-        self.lin11 = nn.Sequential(nn.Linear(128,3), nn.Sigmoid())
+        self.lin10 = nn.Sequential(nn.Linear(width,width//2), nn.ReLU())
+        self.lin11 = nn.Sequential(nn.Linear(width//2,3), nn.Sigmoid())
 
     def forward(self, x):  # (H*W*n_samples) x 3
         residual = x

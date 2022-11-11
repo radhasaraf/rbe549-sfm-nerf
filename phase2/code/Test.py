@@ -34,7 +34,7 @@ def encode_positions(x, n_dim=4):
     outpus:
         y - (H*W*n_samples) x (3*n_dim)
     """
-    positions = []
+    positions = [x]
     #TODO it's crashing here if the image size is 800 x 800
     for i in range(n_dim):
         for fn in [torch.sin, torch.cos]:
@@ -57,7 +57,6 @@ def volumetric_rendering(raw, ts, ray_directions):
     delta_ts = ts[..., 1:] - ts[..., :-1] # n_ray_points-1,
     t1 = torch.Tensor([1e10]).expand(delta_ts[...,:1].shape).to(device)
     delta_ts = torch.cat([delta_ts, t1], -1)  # [n_ray_points,]
-
 
     ray_directions = ray_directions.reshape(rgb.shape[0], -1)  # n_rays(H*W) x 3
     ray_directions_norm = torch.norm(ray_directions[..., None, :], dim =-1) # n_rays x 1 x 3
@@ -95,7 +94,7 @@ def get_rays(image, f, R, T):
     x = (x - image.shape[0]/2)/f  # H x W
     y = (y - image.shape[1]/2)/f  # H x W
     # get directions of each pixel assuming camera at origin
-    ray_directions = torch.stack([x, -y, torch.ones_like(x)], axis=-1)  # H x W x 3
+    ray_directions = torch.stack([x, -y, -torch.ones_like(x)], axis=-1)  # H x W x 3
     # TODO
     # H*W x 3
     # 3 x H*W
@@ -106,12 +105,12 @@ def get_rays(image, f, R, T):
 
     # apply rotation to the directions
     ray_directions = ray_directions[..., None, :]  # H x W x 1 x 3
-    ray_directions = ray_directions*R  # H x W x 3 x 3 = H x W x 1 x 3 * 3 x 3
+    ray_directions = ray_directions * R  # H x W x 3 x 3 = H x W x 1 x 3 * 3 x 3
     ray_directions = torch.sum(ray_directions, -1) # H x W x 3
     ray_origins = torch.broadcast_to(T, ray_directions.shape) # H x W x 3
     return ray_directions, ray_origins
 
-def generate_ray_points(ray_directions, ray_origins, n_ray_point_samples, t_near=0, t_far=1, N_rand_rays=None, n_frequencies=4):
+def generate_ray_points(ray_directions, ray_origins, n_ray_point_samples, t_near=2, t_far=6, N_rand_rays=None, n_frequencies=4, rand=False):
     """
     r = o + t*d 
     building r here
@@ -127,6 +126,13 @@ def generate_ray_points(ray_directions, ray_origins, n_ray_point_samples, t_near
         ts - samples
     """
     ts = torch.linspace(t_near, t_far, n_ray_point_samples).to(device)  # N, 
+
+    if rand:
+        # Inject uniform noise into sample space to make the sampling continuous.
+        shape = list(ray_origins.shape[:-1]) + [n_ray_point_samples]
+        noise = torch.tensor(np.random.uniform(size=shape) * (t_far - t_near) / n_ray_point_samples)
+        ts = ts + noise
+
     rays = ray_origins[..., None, :] + ray_directions[..., None, :]*ts[..., None]  # (n_rays x n_samples x 3 
     points = rays.reshape((-1,3))  # (n_rays*n_samples) x 3
     points = encode_positions(points, n_frequencies)  # (n_rays*n_samples) x (3*4)
@@ -159,15 +165,58 @@ def find_and_load_latest_model(model, args):
     
     return start_iter
 
+def render(gt_image, transform, f, model, is_full_render, args):
+    H, W, _ = gt_image.shape
+    R = transform[:3,:3]
+    T = transform[:3,3]
+    ray_dirs, ray_origins = get_rays(gt_image, f, R, T)  # H x W x 3
+    ray_dirs = ray_dirs.reshape((-1,3))
+    ray_origins = ray_origins.reshape((-1,3))
+
+    ray_sample_ids = None
+    if is_full_render:
+        ray_sample_ids = range(ray_dirs.shape[0])
+    else:
+        ray_sample_ids = random.sample(range(ray_dirs.shape[0]), args.n_rays)  # args.n_rays samples
+
+    ray_origins = ray_origins[ray_sample_ids]
+    ray_dirs = ray_dirs[ray_sample_ids]
+    gt_image_values = gt_image.reshape((-1,3))[ray_sample_ids]
+
+    ray_points, ts = generate_ray_points(
+                                ray_dirs,
+                                ray_origins, 
+                                args.n_ray_points, 
+                                n_frequencies=args.n_pose_frequencies
+                            )  # (n_rays*n_ray_points) x 3
+
+    # execute the model
+    rgbs = model(ray_points)  # model((n_rays*n_ray_points) x (3*2*n_freqs)) -> (n_rays*n_ray_points) x 4
+
+    rgbs = rgbs.reshape(((len(ray_sample_ids)), args.n_ray_points, 4))  # n_rays x n_ray_points x 4
+
+    train_image_values = volumetric_rendering(rgbs, ts, ray_dirs) # n_rays x 3
+    return train_image_values, gt_image_values
 
 def test(args):
     lego_dataset = NeRFDatasetLoader(args.dataset_path, args.mode)
     f, transforms, images = lego_dataset.get_full_data(device)
     
-    # initialize the model
-    model = NeRF(input_channels).to(device)
+    # get input channels
+    height, width, _ = images[0].shape
+    input_channels = 3*2*args.n_pose_frequencies
 
-    pass
+    # initialize the model
+    model = NeRF(input_channels, args.network_width).to(device)
+    model.eval()
+    image1 = images[0]
+    transform1 = transforms[0]
+    image_values, _ = render(image1, transform1, f, model, True, args) # n_rays x 3
+    image = image_values.reshape(image1.shape)
+    cv2.imwrite(f"image_test.png", image.detach().cpu().numpy())
+    cv2.imwrite(f"image1.png", image1.detach().cpu().numpy())
+
+    return
 
 
 def train(args):
@@ -182,7 +231,7 @@ def train(args):
     input_channels = 3*2*args.n_pose_frequencies
 
     # initialize the model
-    model = NeRF(input_channels).to(device)
+    model = NeRF(input_channels, args.network_width).to(device)
 
     # initialize the optimizer
     optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lrate, betas=(0.9, 0.999))
@@ -200,29 +249,8 @@ def train(args):
         for ith_view in tqdm(range(transforms.shape[0])):
             gt_image = images[ith_view]
             transform = transforms[ith_view]
-            H, W, _ = gt_image.shape
-            R = transform[:3,:3]
-            T = transform[:3,3]
-            ray_dirs, ray_origins = get_rays(gt_image, f, R, T)  # H x W x 3
-            ray_dirs = ray_dirs.reshape((-1,3))
-            ray_origins = ray_origins.reshape((-1,3))
-
-            ray_sample_ids = random.sample(range(ray_dirs.shape[0]), args.n_rays)  # args.n_rays samples
-
-            ray_points, ts = generate_ray_points(
-                                        ray_dirs[ray_sample_ids],
-                                        ray_origins[ray_sample_ids], 
-                                        args.n_ray_points, 
-                                        n_frequencies=args.n_pose_frequencies
-                                    )  # (n_rays*n_ray_points) x 3
-
-            # execute the model
-            rgbs = model(ray_points)  # model((n_rays*n_ray_points) x (3*2*n_freqs)) -> (n_rays*n_ray_points) x 4
-
-            rgbs = rgbs.reshape((args.n_rays, args.n_ray_points, 4))  # n_rays x n_ray_points x 4
-
-            train_image_values = volumetric_rendering(rgbs, ts, ray_dirs)
-            gt_image_values = gt_image.reshape((-1,3))[ray_sample_ids]
+            
+            train_image_values, gt_image_values = render(gt_image, transform, f, model, False, args) #(n_rays, 3)
             loss_this_view = photometric_loss(gt_image_values, train_image_values)
 
             optimizer.zero_grad()
@@ -260,6 +288,17 @@ def train(args):
                         'optimizer_state_dict': optimizer.state_dict(),
                         'loss': loss_this_iter}, checkpoint_save_name)
 
+            # render 1st view and save for every checkpoint
+            # model.eval()
+            # image1 = images[0]
+            # transform1 = transforms[0]
+            # image_values, _ = render(image1, transform1, f, model, True, args) # n_rays x 3
+            # image = image_values.reshape(image1.shape)
+            # cv2.imwrite(f"../{args.images_folder}/image_{i_iter}.png", image.detach().cpu().numpy())
+            # model.train()
+
+
+
         # validationBatch = GenerateBatch(TrainSet, valid_idx, TrainLabels, ImageSize, MiniBatchSize)
         # validation_result = model.validation_step(validationBatch)
         # Writer.add_scalar('ValidationLossEveryEpoch',validation_result['loss'],Epochs)
@@ -288,14 +327,16 @@ def configParser():
     parser.add_argument('--mode',default=False,help="to train/test/val")
     parser.add_argument('--lrate',default=5e-4,help="training learning rate")
     parser.add_argument('--lrate_decay',default=25,help="decay learning rate")
-    parser.add_argument('--n_ray_points',default=32,help="number of samples on a ray")
+    parser.add_argument('--n_ray_points',default=64,help="number of samples on a ray")
     parser.add_argument('--n_pose_frequencies',default=2,help="number of positional encoding frequencies for position")
-    parser.add_argument('--n_rays',default=4,help="number of rays to consider in an image")
-    parser.add_argument('--max_iters',default=20000,help="number of max iterations for training")
+    parser.add_argument('--n_rays',default=32*32*8,help="number of rays to consider in an image")
+    parser.add_argument('--max_iters',default=200000,help="number of max iterations for training")
     parser.add_argument('--logs_path',default="../logs/",help="logs path")
     parser.add_argument('--checkpoint_path',default="../checkpoints/",help="checkpoints path")
     parser.add_argument('--load_checkpoint',default=False,help="whether to load checkpoint or not")
-    parser.add_argument('--save_ckpt_every_n_iters',default=200,help="checkpoints path")
+    parser.add_argument('--save_ckpt_every_n_iters',default=20,help="checkpoints path")
+    parser.add_argument('--network_width', default=64,help="number of channels in the network")
+    parser.add_argument('--images_folder', default="../images_folder/",help="folder to store images")
     return parser
 
 if __name__ == "__main__":
