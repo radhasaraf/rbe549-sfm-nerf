@@ -8,20 +8,18 @@ class NeRF(nn.Module):
     """
     def __init__(self, input_channels, width):
         super().__init__()
-        self.lin1 = nn.Sequential(nn.Linear(input_channels + 3,width), nn.ReLU())
+        self.lin1 = nn.Sequential(nn.Linear(input_channels,width), nn.ReLU())
         self.lin2 = nn.Sequential(nn.Linear(width, width), nn.ReLU())
         self.lin3 = nn.Sequential(nn.Linear(width, width), nn.ReLU())
         self.lin4 = nn.Sequential(nn.Linear(width, width), nn.ReLU())
-        self.lin5 = nn.Sequential(nn.Linear(width + input_channels + 3, width), nn.ReLU())
+        self.lin5 = nn.Sequential(nn.Linear(width + input_channels, width), nn.ReLU())
         self.lin6 = nn.Sequential(nn.Linear(width, width), nn.ReLU())
         self.lin7 = nn.Sequential(nn.Linear(width, width), nn.ReLU())
         self.lin8 = nn.Sequential(nn.Linear(width, width), nn.ReLU())
-        self.lin9 = nn.Sequential(nn.Linear(width, width), nn.ReLU())
+        # self.volume_density = nn.Sequential(nn.Linear(width,1), nn.ReLU())
 
-        self.volume_density = nn.Sequential(nn.Linear(width,1), nn.ReLU())
-
-        self.lin10 = nn.Sequential(nn.Linear(width,width//2), nn.ReLU())
-        self.lin11 = nn.Sequential(nn.Linear(width//2,3), nn.Sigmoid())
+        # self.lin10 = nn.Sequential(nn.Linear(width,width//2), nn.ReLU())
+        self.lin11 = nn.Sequential(nn.Linear(width,4))
 
     def forward(self, x):  # (H*W*n_samples) x 3
         residual = x
@@ -33,9 +31,8 @@ class NeRF(nn.Module):
         x = self.lin6(x)
         x = self.lin7(x)
         x = self.lin8(x)
-        x = self.lin9(x)
-        sigma = self.volume_density(x)
-        x = self.lin10(x)
-        rgb = self.lin11(x)
-        rgbs = torch.cat([rgb, sigma], axis=-1)
+        # sigma = self.volume_density(x)
+        # x = self.lin10(x)
+        rgbs = self.lin11(x)
+        # rgbs = torch.cat([rgb, sigma], axis=-1)
         return rgbs  # (H*W*n_samples) x 4

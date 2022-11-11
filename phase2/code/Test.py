@@ -204,7 +204,7 @@ def test(args):
     
     # get input channels
     height, width, _ = images[0].shape
-    input_channels = 3*2*args.n_pose_frequencies
+    input_channels = 3*2*args.n_pose_frequencies + 3
 
     # initialize the model
     model = NeRF(input_channels, args.network_width).to(device)
@@ -282,6 +282,10 @@ def train(args):
         # Save checkpoint every some SaveCheckPoint's iterations
         if i_iter % args.save_ckpt_every_n_iters == 0:
             # Save the Model learnt in this epoch
+            
+            if not (os.path.isdir(args.checkpoint_path)):
+                os.makedirs(args.checkpoint_path)
+            
             checkpoint_save_name =  args.checkpoint_path + os.sep + 'model_' + str(i_iter) + '.ckpt'
             torch.save({'iter': i_iter,
                         'model_state_dict': model.state_dict(),
