@@ -12,6 +12,8 @@ from utils.NeRF import NeRF
 import cv2
 from tqdm import tqdm
 import random
+from torch.utils.tensorboard import SummaryWriter
+import glob
 
 def get_device():
     if torch.cuda.is_available():
@@ -138,7 +140,28 @@ def photometric_loss(gt_image, train_image):
     img_loss = torch.mean((train_image - gt_image)**2)
     return img_loss
 
+def find_and_load_latest_model(model, args):
+    start_iter = 0
+
+    files = glob.glob(args.checkpoint_path + '*.ckpt')
+    
+    latest_ckpt_file = max(files, key=os.path.getctime) if files else None
+
+    if (latest_ckpt_file is not None) and args.load_checkpoint:
+        latest_ckpt = torch.load(latest_ckpt_file)
+        start_iter = int(latest_ckpt_file.split('.')[0][-1])
+        
+        model.load_state_dict(latest_ckpt['model_state_dict'])
+        print(f"Loaded latest checkpoint from {latest_ckpt_file} ....")
+    else:
+        print('New model initialized....')
+    
+    return start_iter
+
 def train(args):
+    # setup tensorboard
+    writer = SummaryWriter(args.logs_path)
+
     lego_dataset = NeRFDatasetLoader(args.dataset_path, args.mode)
     f, transforms, images = lego_dataset.get_full_data(device)
 
@@ -152,11 +175,18 @@ def train(args):
     # initialize the optimizer
     optimizer = torch.optim.Adam(params=model.parameters(), lr=args.lrate, betas=(0.9, 0.999))
 
+    # load the model if already exists
+    start_iter = find_and_load_latest_model(model, args)
+
     model.train()
-    for i_iter in tqdm(range(args.max_iters)):
-        for i in tqdm(range(transforms.shape[0])):
-            gt_image = images[i]
-            transform = transforms[i]
+    
+    for i_iter in tqdm(range(start_iter, args.max_iters)):
+        
+        loss_this_iter = 0
+
+        for ith_view in tqdm(range(transforms.shape[0])):
+            gt_image = images[ith_view]
+            transform = transforms[ith_view]
             H, W, _ = gt_image.shape
             R = transform[:3,:3]
             T = transform[:3,3]
@@ -180,20 +210,49 @@ def train(args):
 
             train_image_values = volumetric_rendering(rgbs, ts, ray_dirs)
             gt_image_values = gt_image.reshape((-1,3))[ray_sample_ids]
-            loss_this_iter = photometric_loss(gt_image_values, train_image_values)
+            loss_this_view = photometric_loss(gt_image_values, train_image_values)
 
             optimizer.zero_grad()
-            loss_this_iter.backward()
+            loss_this_view.backward()
             optimizer.step()
-        
+
+            # accumulate the losses for this iteration
+            loss_this_iter += loss_this_view
+
+            
             # NOTE: from pytorch implementation of NeRF
             # NOTE: IMPORTANT!
             ###   update learning rate   ###
-#            decay_rate = 0.1
-#            decay_steps = args.lrate_decay * 1000
-#            new_lrate = args.lrate * (decay_rate ** (global_step / decay_steps))
-#            for param_group in optimizer.param_groups:
-#                param_group['lr'] = new_lrate
+            #decay_rate = 0.1
+            #decay_steps = args.lrate_decay * 1000
+            #new_lrate = args.lrate * (decay_rate ** (global_step / decay_steps))
+            #for param_group in optimizer.param_groups:
+            #    param_group['lr'] = new_lrate
+
+            # Tensorboard
+            writer.add_scalar('LossEveryView', loss_this_view, i_iter*transforms.shape[0] + ith_view)
+            writer.flush()
+        
+        print(f"loss_this_iter:{loss_this_iter}")
+        writer.add_scalar('LossEveryIter', loss_this_iter, i_iter)
+        writer.flush()
+
+
+        # Save checkpoint every some SaveCheckPoint's iterations
+        if i_iter % args.save_ckpt_every_n_iters == 0:
+            # Save the Model learnt in this epoch
+            checkpoint_save_name =  args.checkpoint_path + os.sep + str(i_iter) + 'model.ckpt'
+            torch.save({'iter': i_iter,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'loss': loss_this_iter}, checkpoint_save_name)
+
+        # validationBatch = GenerateBatch(TrainSet, valid_idx, TrainLabels, ImageSize, MiniBatchSize)
+        # validation_result = model.validation_step(validationBatch)
+        # Writer.add_scalar('ValidationLossEveryEpoch',validation_result['loss'],Epochs)
+        # Writer.add_scalar('ValidationAccuracyEveryEpoch',validation_result['acc'],Epochs)
+        # Writer.flush()
+        
 
     print("training is done!")
 
@@ -205,7 +264,7 @@ def main(args):
     elif args.mode == "test":
         test(args)
     else:
-        print("need to give some argument!")
+        print("Broooooooo! need to give some argument man!")
     return
 
 def configParser():
@@ -220,6 +279,9 @@ def configParser():
     parser.add_argument('--n_pose_frequencies',default=2,help="number of positional encoding frequencies for position")
     parser.add_argument('--n_rays',default=4,help="number of rays to consider in an image")
     parser.add_argument('--max_iters',default=20000,help="number of max iterations for training")
+    parser.add_argument('--logs_path',default="../logs/",help="logs path")
+    parser.add_argument('--checkpoint_path',default="../checkpoints/",help="checkpoints path")
+    parser.add_argument('--save_ckpt_every_n_iters',default=200,help="checkpoints path")
     return parser
 
 if __name__ == "__main__":

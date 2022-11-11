@@ -1,11 +1,15 @@
 TODOs
 - [*] take random rays
-- [ ] add tensorboard
+- [*] add tensorboard
+- [*] save and load checkpoint
+- [ ] add test code
+- [ ] create a video
 - [ ] add visualization step
 - [ ] randomness in sampling points
+- [ ] add decay in learning rate
+- [ ] image crop to learn feature of interest
 - [ ] paper is normalizing the position and directional encoding to [-1, 1]
 - [ ] add evaluation step
-- [ ] create a video
 - [ ] heirarchial sampling -- involves fine network
 - [ ] viewing directions in the network
 - [ ] add noise to the raw density outputs in volume rendering
