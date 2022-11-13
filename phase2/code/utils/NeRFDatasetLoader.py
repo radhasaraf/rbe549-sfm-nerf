@@ -7,6 +7,7 @@ import math
 from torch.utils.data import Dataset
 from skimage import io
 import cv2
+from matplotlib import pyplot as plt
 
 class NeRFDatasetLoader(Dataset):
     """
@@ -41,6 +42,8 @@ class NeRFDatasetLoader(Dataset):
         print(f"Loading {transforms_path} for {mode}")
         with open(transforms_path) as file:
             self.data = json.load(file)
+
+        self.tiny_data = np.load("tiny_nerf_data.npz")
 
     def __len__(self):
         return len(self.data["frames"])
@@ -85,3 +88,10 @@ class NeRFDatasetLoader(Dataset):
             images.append(torch.tensor(data["image"]))
 
         return torch.tensor(focal_length).to(device), torch.stack(transforms).to(device), torch.stack(images).to(device)
+
+    def get_tiny_data(self, device):
+        images = self.tiny_data["images"]
+        images = torch.tensor(images).to(device)
+        transforms = torch.tensor(self.tiny_data["poses"]).to(device)
+        focal = torch.tensor(self.tiny_data["focal"])
+        return focal, transforms, images

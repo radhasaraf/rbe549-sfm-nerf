@@ -131,3 +131,6 @@ dmypy.json
 *swp
 *lego
 *tiny*
+*.ckpt
+*.tfevents*
+phase2/images_folder/
