@@ -7,6 +7,7 @@ import math
 from torch.utils.data import Dataset
 from skimage import io
 import cv2
+from matplotlib import pyplot as plt
 
 class NeRFDatasetLoader(Dataset):
     """
@@ -89,7 +90,8 @@ class NeRFDatasetLoader(Dataset):
         return torch.tensor(focal_length).to(device), torch.stack(transforms).to(device), torch.stack(images).to(device)
 
     def get_tiny_data(self, device):
-        images = torch.tensor(self.tiny_data["images"]).to(device)
+        images = self.tiny_data["images"]
+        images = torch.tensor(images).to(device)
         transforms = torch.tensor(self.tiny_data["poses"]).to(device)
         focal = torch.tensor(self.tiny_data["focal"])
         return focal, transforms, images

@@ -14,6 +14,14 @@ from tqdm import tqdm
 import random
 from torch.utils.tensorboard import SummaryWriter
 import glob
+import imageio
+
+random.seed(42)
+np.random.seed(42)
+
+def normalize(image_mat):                                                                                                                                                             
+    return cv2.normalize(image_mat,dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+
 
 def get_device():
     if torch.cuda.is_available():
@@ -78,7 +86,7 @@ def volumetric_rendering(raw, ts, ray_directions):
     rgb_map = torch.sum(weights[...,None] * rgb, -2)  # [N_rays, 3]
     return rgb_map
 
-def get_rays(image, f, R, T):
+def get_rays(H, W, f, R, T):
     """
     r = o + t*d 
     Building o and d here 
@@ -93,14 +101,14 @@ def get_rays(image, f, R, T):
         ray_origins - H x W x 3
     """
     # create meshgrid
-    xs = torch.linspace(0, image.shape[0]-1, image.shape[0]).to(device)  # 1 x W
-    ys = torch.linspace(0, image.shape[1]-1, image.shape[1]).to(device)  # 1 x H
+    xs = torch.linspace(0, H-1, H).to(device)  # 1 x W
+    ys = torch.linspace(0, W-1, W).to(device)  # 1 x H
     x, y = torch.meshgrid(xs, ys)   # W x H, W x H
     x = x.t()  # H x W
     y = y.t()  # H x W
 
-    x = (x - image.shape[0]/2)/f  # H x W
-    y = (y - image.shape[1]/2)/f  # H x W
+    x = (x - H/2)/f  # H x W
+    y = (y - W/2)/f  # H x W
     # get directions of each pixel assuming camera at origin
     ray_directions = torch.stack([x, -y, -torch.ones_like(x)], axis=-1)  # H x W x 3
     # TODO
@@ -173,11 +181,10 @@ def find_and_load_latest_model(model, args):
     
     return start_iter
 
-def render(gt_image, transform, f, model, is_full_render, args):
-    H, W, _ = gt_image.shape
+def render(H, W, transform, f, model, is_full_render, args):
     R = transform[:3,:3]
     T = transform[:3,3]
-    ray_dirs, ray_origins = get_rays(gt_image, f, R, T)  # H x W x 3
+    ray_dirs, ray_origins = get_rays(H, W, f, R, T)  # H x W x 3
     ray_dirs = ray_dirs.reshape((-1,3))
     ray_origins = ray_origins.reshape((-1,3))
 
@@ -189,7 +196,6 @@ def render(gt_image, transform, f, model, is_full_render, args):
 
     ray_origins = ray_origins[ray_sample_ids]
     ray_dirs = ray_dirs[ray_sample_ids]
-    gt_image_values = gt_image.reshape((-1,3))[ray_sample_ids]
 
     ray_points, ts = generate_ray_points(
                                 ray_dirs,
@@ -204,25 +210,78 @@ def render(gt_image, transform, f, model, is_full_render, args):
     rgbs = rgbs.reshape(((len(ray_sample_ids)), args.n_ray_points, 4))  # n_rays x n_ray_points x 4
 
     train_image_values = volumetric_rendering(rgbs, ts, ray_dirs) # n_rays x 3
-    return train_image_values, gt_image_values
+    return train_image_values, ray_sample_ids
+
+def get_translation_t(t):
+    """Get the translation matrix for movement in t."""
+    matrix = [
+        [1, 0, 0, 0],
+        [0, 1, 0, 0],
+        [0, 0, 1, t],
+        [0, 0, 0, 1],
+    ]
+    return torch.tensor(matrix, dtype=torch.float32)
+
+
+def get_rotation_phi(phi):
+    """Get the rotation matrix for movement in phi."""
+    matrix = [
+        [1, 0, 0, 0],
+        [0, np.cos(phi), -np.sin(phi), 0],
+        [0, np.sin(phi), np.cos(phi), 0],
+        [0, 0, 0, 1],
+    ]
+    return torch.tensor(matrix, dtype=torch.float32)
+
+
+def get_rotation_theta(theta):
+    """Get the rotation matrix for movement in theta."""
+    matrix = [
+        [np.cos(theta), 0, -np.sin(theta), 0],
+        [0, 1, 0, 0],
+        [np.sin(theta), 0, np.cos(theta), 0],
+        [0, 0, 0, 1],
+    ]
+    return torch.tensor(matrix, dtype=torch.float32)
+
+
+def pose_spherical(theta, phi, t):
+    """
+    Get the camera to world matrix for the corresponding theta, phi
+    and t.
+    """
+    c2w = get_translation_t(t)
+    c2w = get_rotation_phi(phi / 180.0 * np.pi) @ c2w
+    c2w = get_rotation_theta(theta / 180.0 * np.pi) @ c2w
+    c2w = torch.tensor([[-1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]], dtype=torch.float32) @ c2w
+    return c2w
+
 
 def test(args):
     lego_dataset = NeRFDatasetLoader(args.dataset_path, args.mode)
-    f, transforms, images = lego_dataset.get_full_data(device)
+    f, transforms, orig_images = lego_dataset.get_tiny_data(device)
     
     # get input channels
-    height, width, _ = images[0].shape
     input_channels = 3*2*args.n_pose_frequencies + 3
 
     # initialize the model
     model = NeRF(input_channels, args.network_width).to(device)
+    start_iter = find_and_load_latest_model(model, args)
     model.eval()
-    image1 = images[0]
-    transform1 = transforms[0]
-    image_values, _ = render(image1, transform1, f, model, True, args) # n_rays x 3
-    image = image_values.reshape(image1.shape)
-    cv2.imwrite(f"image_test.png", image.detach().cpu().numpy())
-    cv2.imwrite(f"image1.png", image1.detach().cpu().numpy())
+
+    images = []
+    H, W, _ = orig_images[0].shape
+    for index, theta in tqdm(enumerate(np.linspace(0.0, 360, 120, endpoint=False))):
+        c2w = pose_spherical(theta, -30.0, 4.0)
+        
+        transform = c2w.to(device)
+        image_values, _ = render(H, W, transform, f, model, True, args) # n_rays x 3
+        image = image_values.reshape((H, W, 3))
+        image = image.detach().cpu().numpy()
+        image = normalize(image)
+        images.append(image)
+    
+    imageio.mimwrite("lego_gif.mp4", images, fps=30, quality=7, macro_block_size=None)
 
     return
 
@@ -235,7 +294,6 @@ def train(args):
     f, transforms, images = lego_dataset.get_tiny_data(device)
 
     # get input channels
-    height, width, _ = images[0].shape
     input_channels = 3*2*args.n_pose_frequencies + 3
 
     # initialize the model
@@ -258,7 +316,8 @@ def train(args):
             gt_image = images[ith_view]
             transform = transforms[ith_view]
             
-            train_image_values, gt_image_values = render(gt_image, transform, f, model, False, args) #(n_rays, 3)
+            model.train()
+            train_image_values, gt_image_values = render(gt_image, transform, f, model, True, args) #(n_rays, 3)
             loss_this_view = photometric_loss(gt_image_values, train_image_values)
 
             optimizer.zero_grad()
@@ -279,10 +338,11 @@ def train(args):
             #    param_group['lr'] = new_lrate
 
             # Tensorboard
+            # print(loss_this_iter)
             writer.add_scalar('LossEveryView', loss_this_view, i_iter*transforms.shape[0] + ith_view)
             writer.flush()
         
-        print(f"i_iter:{i_iter}, loss_this_iter:{loss_this_iter}")
+        print(f"i_iter:{i_iter}, loss_this_iter:{loss_this_iter}\n")
         writer.add_scalar('LossEveryIter', loss_this_iter, i_iter)
         writer.flush()
 
@@ -306,9 +366,6 @@ def train(args):
             # transform1 = transforms[0]
             # image_values, _ = render(image1, transform1, f, model, True, args) # n_rays x 3
             # image = image_values.reshape(image1.shape)
-            # # print("saving images")
-            # # cv2.imshow(f"{args.images_folder}/image_{i_iter}.png", image.detach().cpu().numpy())
-            # # cv2.waitKey(0)
             # cv2.imwrite(f"{args.images_folder}/image_{i_iter}.png", image.detach().cpu().numpy())
             # model.train()
 
@@ -344,12 +401,12 @@ def configParser():
     parser.add_argument('--lrate_decay',default=25,help="decay learning rate")
     parser.add_argument('--n_ray_points',default=64,help="number of samples on a ray")
     parser.add_argument('--n_pose_frequencies',default=16,help="number of positional encoding frequencies for position")
-    parser.add_argument('--n_rays',default=32*32*8,help="number of rays to consider in an image")
+    parser.add_argument('--n_rays',default=10000,help="number of rays to consider in an image")
     parser.add_argument('--max_iters',default=200000,help="number of max iterations for training")
     parser.add_argument('--logs_path',default="../logs/",help="logs path")
     parser.add_argument('--checkpoint_path',default="../checkpoints/",help="checkpoints path")
     parser.add_argument('--load_checkpoint',default=False,help="whether to load checkpoint or not")
-    parser.add_argument('--save_ckpt_every_n_iters',default=20,help="checkpoints path")
+    parser.add_argument('--save_ckpt_every_n_iters',default=2,help="checkpoints path")
     parser.add_argument('--network_width', default=64,help="number of channels in the network")
     parser.add_argument('--images_folder', default="../images_folder/",help="folder to store images")
     return parser
