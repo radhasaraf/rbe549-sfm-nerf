@@ -10,12 +10,15 @@ from ExtractCameraPose import *
 from LinearTriangulation import *
 from DisambiguateCameraPose import *
 from NonlinearTriangulation import refine_triangulated_coords
-
+from LinearPnP import get_camera_extr_using_linear_pnp
+from PnPRANSAC import refine_extr_using_PnPRANSAC
+# from matplotlib import pyplot as plt
 from ShowOutputs import *
 
 from utils.helpers import homogenize_coords
 
-def get_2d_to_3d_correspondences(D, i, R, C, K):
+
+def get_2d_to_3d_correspondences(D, i, Rs, Cs, K):
     """
     Returns the image and world points for the ith image based on matches and
     prior camera poses.
@@ -23,8 +26,8 @@ def get_2d_to_3d_correspondences(D, i, R, C, K):
     inputs:
         D - data structure
         i - index on for which we need to get world correspondences, starts with 1
-        R - List[i-1; 3 x 3] list of rotation matrices 
-        C - List[i-1; 3 x 1] list of camera poses 
+        Rs - List[i-1; 3 x 3] list of rotation matrices
+        Cs - List[i-1; 3 x 1] list of camera poses
     outputs:
         v - N x 2 - features N x 2
         X - N x 3 - world points on image N x 3
@@ -35,7 +38,7 @@ def get_2d_to_3d_correspondences(D, i, R, C, K):
         vj, vi = D[(j,i)]  # N x 2, N x 2
         vj = homogenize_coords(vj).T  # 3 x N
         xj = np.linalg.inv(K) @ vj  # 3 x 3 @ 3 x N
-        X = R.T @ xj + C  # 3 x N
+        X = Rs[j-1].T @ xj + Cs[j-1].reshape((3, -1))  # 3 x N
         world_points.append(X.T)  # List(N x 3)
         image_points.append(vi)
 
@@ -57,21 +60,50 @@ def main(args):
     K = load_camera_intrinsics(f"{base_path}{calibration_file}")
 
     # get matches
-    img_pair_feat_matches = load_and_get_feature_matches(base_path)
+    sfm_map = SFMMap(base_path)
+    # print(sfm_map.visibility_matrix)
 
     # get inliers RANSAC for all images
-    corrected_pair_feat_matches = {}
-    for key, value in img_pair_feat_matches.items():
-        corrected_pair_feat_matches[key] = get_inliers_RANSAC(value[0],value[1],1000,0.090)
+    # corrected_pair_feat_matches = {}
+    # for key, value in img_pair_feat_matches.items():
+    #     corrected_pair_feat_matches[key] = perform_RANSAC(value[0],value[1],1000,0.090)
+
+    img_pairs = [
+        (1, 2), (1, 3), (1, 4), (1, 5), (2, 3), (2, 4), (2, 5), (3, 4),
+        (3, 5), (4, 5)
+    ]
 
     if args.debug:
-        show_before_after_RANSAC(imgs, img_pair_feat_matches, corrected_pair_feat_matches)
-        show_sample_matches_epipolars(imgs, corrected_pair_feat_matches)
+        test_key = (1,2)
+        matches_before = sfm_map.get_feat_matches(test_key)
+
+
+    for pair in img_pairs:
+        # Refine matches using RANSAC
+        vi, vj, orig_idxs = sfm_map.get_feat_matches(pair)
+        inlier_idxs = perform_RANSAC(vi, vj, 1000, 0.1)
+
+        inlier_orig_indices = orig_idxs[np.where(inlier_idxs)[0]]
+        outlier_set = set(orig_idxs) - set(inlier_orig_indices)
+        outlier_idxs = np.array(list(outlier_set))  # Get outliers (idxs, inlier_idxs)
+
+        sfm_map.remove_matches(pair, outlier_idxs)
+
+    if args.debug:
+        matches_after = sfm_map.get_feat_matches((1,2))
+        show_before_after_RANSAC(imgs, test_key, matches_before, matches_after)
+        # show_sample_matches_epipolars(imgs, test_key, matches_after)
 
     # estimate Fundamental matrix (F)
-    F = get_ij_fundamental_matrix(1, 2, corrected_pair_feat_matches)
-    if args.display:
-        show_epipolars(imgs[1], imgs[2], F, corrected_pair_feat_matches[(1,2)], f"epipolars_1_2")
+    F = get_ij_fundamental_matrix(1, 2, sfm_map)
+    if args.debug:
+        matches_after = sfm_map.get_feat_matches((1,2))
+        show_epipolars(imgs[1], imgs[2], F, matches_after, f"epipolars_1_2")
+
+
+    if args.debug or args.display:
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
     # estimate essential matrix E from Fundamental matrix F
     E = essential_from_fundamental(K, F, args)
@@ -86,22 +118,39 @@ def main(args):
     v1, v2 = corrected_pair_feat_matches[(1,2)]
     Xs_all_poses = []
 
+    C0 = np.zeros(3)
+    R0 = np.eye(3)
+
     for C,R in zip(Cs,Rs):
-        Xs = triangulate_points(K, np.zeros(3), np.eye(3), C, R, v1, v2)
+        Xs = triangulate_points(K, C0, R0, C, R, v1, v2)
         Xs_all_poses.append(Xs)
 
     # disambiguate the poses using chierality condition
     C, R, X_linear = disambiguate_camera_poses(Cs, Rs, Xs_all_poses)
 
     # perform non-linear triangulation
-    X_non_linear = refine_triangulated_coords(K, np.zeros(3), np.eye(3), C, R, v1, v2, X_linear)
+    X_non_linear = refine_triangulated_coords(K, C0, R0, C, R, v1, v2, X_linear)
 
-    if args.display:
+    if args.debug:
         show_disambiguated_and_corrected_poses(Xs_all_poses, X_linear, X_non_linear)
 
-    ## camera registration
+    #
+    r_mats = [np.eye(3), R]
+    t_vecs = [np.zeros(3), C]
+    for ith_view in range(3, len(imgs)+1):
+        img_pts, world_pts = get_2d_to_3d_correspondences(
+            corrected_pair_feat_matches, ith_view, r_mats, t_vecs, K
+        )
+        R_new, C_new, _, _ = refine_extr_using_PnPRANSAC(img_pts, world_pts, K, 10000, 1000)
 
-    # perform LinearPnP
+        r_mats.append(R_new)
+        t_vecs.append(C_new)
+
+        X_new = triangulate_points(K, C0, R0, C_new, R_new, )
+
+    if args.debug:
+        show_pnp_poses(t_vecs)
+
     # optimize using NonLinearPnP
     # new 3D points using Linear Triangulation
     # optimize new 3D points using NonLinear Triangulation

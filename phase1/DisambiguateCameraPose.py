@@ -4,11 +4,11 @@ def disambiguate_camera_poses(Cs, Rs, Xs):
     """
     Finds the correct camera pose obtd from ExtractCameraPose.py
     inputs:
-        Cs - List[4; 3 x 1, 3 x 3] all possible translations
+        Cs - List[4; 3, , 3 x 3] all possible translations
         Rs - List[4; 3 x 1, 3 x 3] all possible rotations
         Xs - List[4; N x 3] all possible Xs corresponding to the poses
     outputs:
-        pose: [3 x 1, 3 x 3]
+        pose: [3, , 3 x 3]
     """
     # For all poses
     correctC = None
@@ -34,4 +34,4 @@ def disambiguate_camera_poses(Cs, Rs, Xs):
             correctX = X[inliers]
             max_inliers = inliers
 
-    return correctC, correctR, correctX
+    return correctC.flatten(), correctR, correctX

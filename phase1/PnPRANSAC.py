@@ -1,10 +1,10 @@
 from LinearPnP import get_camera_extr_using_linear_pnp
 import random
 import numpy as np
-from utils.helpers import homogenize_coords, unhomogenize_coords
+from utils.helpers import homogenize_coords
 
 
-def refine_extr_using_RANSAC(features, world_points, max_iters, threshold, K):
+def refine_extr_using_PnPRANSAC(features, world_points, K, max_iters=1000, threshold=1e-10):
     """
     Refines and returns extrinsics, inlier set of features and world points
     inputs:
@@ -34,13 +34,13 @@ def refine_extr_using_RANSAC(features, world_points, max_iters, threshold, K):
         )
 
         # Make sure to consider t in P wrt camera
-        T = -R * C
-        P = K @ np.hstack((R,T))
+        T = -R @ C.reshape((3, 1))
+        P = K @ np.concatenate((R,T), axis=1)
         P1, P2, P3 = P  # 4, 4, 4,
 
-        u_num = P1 @ homogenized_world_points.T  # N,
-        v_num = P2 @ homogenized_world_points.T  # N,
-        denom = P3 @ homogenized_world_points.T  # N,
+        u_num = np.dot(P1, homogenized_world_points.T)  # N,
+        v_num = np.dot(P2, homogenized_world_points.T)  # N,
+        denom = np.dot(P3, homogenized_world_points.T)  # N,
 
         u_ = u_num / denom
         v_ = v_num / denom
@@ -52,6 +52,7 @@ def refine_extr_using_RANSAC(features, world_points, max_iters, threshold, K):
         if np.sum(curr_inliers) > np.sum(max_inliers):
             max_inliers = curr_inliers
 
+    print(f"max_inliers_len:{np.sum(max_inliers)}")
     feature_inliers = features[max_inliers]
     world_point_inliers = world_points[max_inliers]
 

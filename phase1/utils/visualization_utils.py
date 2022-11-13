@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 from utils.helpers import homogenize_coords
 from EstimateFundamentalMatrix import get_epipoles, get_epipolars
+from typing import Tuple
+from matplotlib import pyplot as plt
 
 def plot_features(img, features, color=(0, 255, 0), marker_type=cv2.MARKER_CROSS, thickness=4):
     """
@@ -159,3 +161,17 @@ def show_rotation():
     plot new axis based on new rotation
     """
     pass
+
+def show_pnp_poses(T):
+    """
+    show marker
+    show 1st camera
+    show 2nd camera ?
+        translate
+    T - List[N; 3 x 1]
+    """
+    plt.figure("PnP Poses")
+    for t in T:
+        print(t)
+        plt.scatter(t[0], t[2], marker='^', s=20)
+    plt.show()
