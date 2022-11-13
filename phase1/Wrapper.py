@@ -61,16 +61,10 @@ def main(args):
 
     # get matches
     sfm_map = SFMMap(base_path)
-    # print(sfm_map.visibility_matrix)
-
-    # get inliers RANSAC for all images
-    # corrected_pair_feat_matches = {}
-    # for key, value in img_pair_feat_matches.items():
-    #     corrected_pair_feat_matches[key] = perform_RANSAC(value[0],value[1],1000,0.090)
 
     img_pairs = [
-        (1, 2), (1, 3), (1, 4), (1, 5), (2, 3), (2, 4), (2, 5), (3, 4),
-        (3, 5), (4, 5)
+        (1, 2), (1, 3), (1, 4), (1, 5), (2, 3),
+        (2, 4), (2, 5), (3, 4), (3, 5), (4, 5)
     ]
 
     if args.debug:
@@ -81,7 +75,7 @@ def main(args):
     for pair in img_pairs:
         # Refine matches using RANSAC
         vi, vj, orig_idxs = sfm_map.get_feat_matches(pair)
-        inlier_idxs = perform_RANSAC(vi, vj, 1000, 0.1)
+        inlier_idxs = perform_RANSAC(vi, vj, 1000, 0.01)
 
         inlier_orig_indices = orig_idxs[np.where(inlier_idxs)[0]]
         outlier_set = set(orig_idxs) - set(inlier_orig_indices)
@@ -100,11 +94,6 @@ def main(args):
         matches_after = sfm_map.get_feat_matches((1,2))
         show_epipolars(imgs[1], imgs[2], F, matches_after, f"epipolars_1_2")
 
-
-    if args.debug or args.display:
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-
     # estimate essential matrix E from Fundamental matrix F
     E = essential_from_fundamental(K, F, args)
 
@@ -115,7 +104,7 @@ def main(args):
     Cs, Rs = extract_camera_pose(E)
 
     # triangulate the feature points to world points using camera poses
-    v1, v2 = corrected_pair_feat_matches[(1,2)]
+    v1, v2, orig_idxs_12 = sfm_map.get_feat_matches((1,2))
     Xs_all_poses = []
 
     C0 = np.zeros(3)
@@ -126,29 +115,39 @@ def main(args):
         Xs_all_poses.append(Xs)
 
     # disambiguate the poses using chierality condition
-    C, R, X_linear = disambiguate_camera_poses(Cs, Rs, Xs_all_poses)
+    C, R, X_linear, mod_idxs_12 = disambiguate_camera_poses(
+        Cs, Rs, Xs_all_poses, orig_idxs_12
+    )
 
     # perform non-linear triangulation
     X_non_linear = refine_triangulated_coords(K, C0, R0, C, R, v1, v2, X_linear)
 
+    # register world points from 1st and 2nd camera view in the SFMMap
+    sfm_map.add_world_points(X_non_linear, mod_idxs_12)
+
     if args.debug:
         show_disambiguated_and_corrected_poses(Xs_all_poses, X_linear, X_non_linear)
 
-    #
+    if args.debug or args.display:
+        plt.show()
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
     r_mats = [np.eye(3), R]
     t_vecs = [np.zeros(3), C]
     for ith_view in range(3, len(imgs)+1):
-        img_pts, world_pts = get_2d_to_3d_correspondences(
-            corrected_pair_feat_matches, ith_view, r_mats, t_vecs, K
+        img_pts, world_pts = sfm_map.get_2d_to_3d_correspondences(ith_view)
+
+        R_new, C_new, _, _ = refine_extr_using_PnPRANSAC(
+            img_pts, world_pts, K, 10000, 1000
         )
-        R_new, C_new, _, _ = refine_extr_using_PnPRANSAC(img_pts, world_pts, K, 10000, 1000)
 
         r_mats.append(R_new)
         t_vecs.append(C_new)
 
-        X_new = triangulate_points(K, C0, R0, C_new, R_new, )
+        # X_new = triangulate_points(K, C0, R0, C_new, R_new, )
 
-    if args.debug:
+    if args.display:
         show_pnp_poses(t_vecs)
 
     # optimize using NonLinearPnP
@@ -157,7 +156,7 @@ def main(args):
     # add new 3D points to whole data
     # Build Visibility matrix
     # perform Bundle Adjustment
-    
+
     if args.debug or args.display:
         plt.show()
         cv2.waitKey(0)

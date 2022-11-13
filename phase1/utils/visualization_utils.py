@@ -120,7 +120,7 @@ def show_epipolars(img1, img2, F, features, window_name, line_color=(0, 0, 0)):
     v1 = homogenize_coords(features[0]) # N x 3
     v2 = homogenize_coords(features[1]) # N x 3
 
-    # epipolars 
+    # epipolars
     lines1, lines2  = get_epipolars(F, v1, v2)
 
     # epipoles
@@ -138,7 +138,7 @@ def show_epipolars(img1, img2, F, features, window_name, line_color=(0, 0, 0)):
 
     plot_features(img1_copy, v1)
     plot_features(img1_copy, [e1], color=(0,0,255), marker_type=cv2.MARKER_STAR,thickness=6)
-    
+
     img2_copy = img2.copy()
     for first_point, second_point in zip(first_points2, second_points2):
         cv2.line(img2_copy, first_point, second_point, line_color, 1)

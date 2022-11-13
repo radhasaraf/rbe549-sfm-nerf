@@ -38,7 +38,7 @@ def show_before_after_RANSAC(imgs, test_key, matches_before, matches_after):
 
     show_matches2(img1, img2,[v1, v2], f"before_RANSAC_{test_key}")
     show_matches2(img1, img2,[v1_corrected, v2_corrected], f"after_RANSAC_{test_key}")
-    
+
 def show_disambiguated_and_corrected_poses(Xs_all_poses, X_linear, X_non_linear):
     plt.figure("camera disambiguation")
     colors = ['red','brown','greenyellow','teal']

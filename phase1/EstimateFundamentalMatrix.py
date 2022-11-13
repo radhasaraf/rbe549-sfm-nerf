@@ -28,7 +28,7 @@ def estimate_fundamental_matrix(v1, v2):
     UF, sigmaF, VF = np.linalg.svd(F)
     sigmaF[2] = 0 # enforcing rank 2 constraint
     reestimatedF = UF @ np.diag(sigmaF) @ VF
-    reestimatedF = reestimatedF/reestimatedF[2,2]
+    # reestimatedF = reestimatedF/reestimatedF[2,2]
 
     return F, reestimatedF
 
@@ -81,4 +81,3 @@ def get_epipolars(F, v1, v2):
     lines1 = F.T @ v2.T # (3 x 3 @ 3 x N) = 3 x N
     lines2 = F @ v1.T # (3 x 3 @ 3 x N) = 3 x N
     return lines1, lines2
-

@@ -62,4 +62,3 @@ def refine_extr_using_PnPRANSAC(features, world_points, K, max_iters=1000, thres
     )
 
     return R, C, feature_inliers, world_point_inliers
-

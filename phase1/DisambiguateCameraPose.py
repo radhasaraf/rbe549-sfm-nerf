@@ -1,14 +1,16 @@
 import numpy as np
 
-def disambiguate_camera_poses(Cs, Rs, Xs):
+def disambiguate_camera_poses(Cs, Rs, Xs, orig_idxs):
     """
     Finds the correct camera pose obtd from ExtractCameraPose.py
     inputs:
         Cs - List[4; 3, , 3 x 3] all possible translations
         Rs - List[4; 3 x 1, 3 x 3] all possible rotations
         Xs - List[4; N x 3] all possible Xs corresponding to the poses
+        orig_idxs - N, array of indices of visibilty matrix
     outputs:
         pose: [3, , 3 x 3]
+        visibility_idxs - N, modified array of indices of visibility matrix
     """
     # For all poses
     correctC = None
@@ -32,6 +34,7 @@ def disambiguate_camera_poses(Cs, Rs, Xs):
             correctC = C
             correctR = R
             correctX = X[inliers]
+            visibility_idxs = orig_idxs[inliers]
             max_inliers = inliers
 
-    return correctC.flatten(), correctR, correctX
+    return correctC.flatten(), correctR, correctX, visibility_idxs

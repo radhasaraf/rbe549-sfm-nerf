@@ -105,6 +105,9 @@ class SFMMap():
         self.visibility_matrix = None
         self._load()
 
+        self.world_points = np.empty((self.visibility_matrix.shape[0],3))
+        self.world_points.fill(np.nan)
+
     def _load(self) -> None:
         """
         inputs:
@@ -223,11 +226,39 @@ class SFMMap():
 
         self.visibility_matrix[outlier_idxs, j] = False
 
-    def get_2d_to_3d_correspondences(self):
-        pass
+    def get_2d_to_3d_correspondences(self, ith_view):
+        """
+        inputs:
+            ith_view: view for which we need 2D<->3D correspondences
+        outputs:
+            v: M x 2 - features
+            X: M x 3 - corresponding world points
+        """
+        i = ith_view - 1
 
-# def update_v_matrix(img_pair: Tuple[int, int], idxs:):
-#     pass
+        # get indices from world_points where it is not nan
+        indices_world = np.argwhere(~np.isnan(self.world_points[:,0])).flatten() # M1,
+
+        # we will get indices for ith_view from visibility_matrix
+        indices_visibility = np.where(self.visibility_matrix[:,i])[0] # M2,
+
+        # find intersection of indices_world and indices_visibility
+        indices = list(set(indices_world) & set(indices_visibility))
+
+        v = [self.features_u[indices, i], self.features_v[indices, i]]
+        v = np.vstack(v).T  # M x 2
+
+        X = self.world_points[indices]  # M x 3
+        return v, X
+    def add_world_points(self, world_points, indices):
+        """
+        inputs:
+            world_points: M x 3
+            indices: M,
+        outputs:
+            None
+        """
+        self.world_points[indices] = world_points
 
 # One data structure that contains features, feat matches, world coords,
 # visisibility matrix info.
@@ -241,3 +272,13 @@ class SFMMap():
 # Updating the visibility matrix: Update True/False given image correspondences
 # Update world coordinates post triangulation
 # Getter(visibility) for BA
+
+
+# 2d to 3d correspondences
+# with sfm_map
+# before that we need to add the world points into sfm map
+# 3 pairs of images and the common correspondences
+
+# we need 2D to 3D correspondences for 3
+# we already have 2D to 3D correspondeces between 1 and 2
+# we will get 2D to 3D for 3 using common features between 1, 2 and 3
