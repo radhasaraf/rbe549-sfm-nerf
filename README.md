@@ -10,12 +10,12 @@ Reconstruction of a 3d scene from a set of images with different view points (ca
 
 ### Training Progress
 <p float="middle">
-<img src="phase2/outputs/loss_every_view.png" width="800" height="400"/>
+<img src="phase2/outputs/loss_every_view.png" width="700" height="350"/>
 </p>
 
 
 <p float="middle">
-<img src="phase2/outputs/loss_every_iter.png" width="800" height="400"/>
+<img src="phase2/outputs/loss_every_iter.png" width="700" height="350"/>
 </p>
 
 
