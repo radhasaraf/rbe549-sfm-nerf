@@ -6,7 +6,7 @@ from utils.helpers import homogenize_coords,unhomogenize_coords
 random.seed(42)
 
 
-def get_inliers_RANSAC(v1,v2,max_iterations,threshold):
+def perform_RANSAC(v1, v2, max_iterations, threshold):
     """
     input:
         v1, v2 - non-homogenous image feature coordinates
@@ -14,12 +14,12 @@ def get_inliers_RANSAC(v1,v2,max_iterations,threshold):
         max_iterations - number of iterations it should run ransac for
         threshold - error threshold
     output:
-        inliers - List[2, N x 2]
+        inliers - List[2, N x 2]  #TODO change
     """
     v1 = homogenize_coords(v1) # N x 3
     v2 = homogenize_coords(v2) # N x 3
 
-    max_inliers = []
+    max_inliers_idxs = []
     for iter in range(max_iterations):
         # sample some random points assuming they are inliers
         sample_inds = random.sample(range(v1.shape[0]-1),8)
@@ -35,15 +35,8 @@ def get_inliers_RANSAC(v1,v2,max_iterations,threshold):
         error = np.sum(error,axis=1) # N,
 
         # check if error is below some threshold for rest of the points
-        curr_inliers = abs(error) < threshold # N,
-        if np.sum(curr_inliers) > np.sum(max_inliers):
-            max_inliers = curr_inliers
+        curr_inliers_idxs = abs(error) < threshold # N,
+        if np.sum(curr_inliers_idxs) > np.sum(max_inliers_idxs):
+            max_inliers_idxs = curr_inliers_idxs
 
-    v1_inliers = v1[max_inliers]
-    v2_inliers = v2[max_inliers]
-
-    # Un-homogenize
-    v1_inliers = unhomogenize_coords(v1_inliers)
-    v2_inliers = unhomogenize_coords(v2_inliers)
-
-    return [v1_inliers, v2_inliers]
+    return max_inliers_idxs

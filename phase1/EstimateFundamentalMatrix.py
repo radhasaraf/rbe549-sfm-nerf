@@ -13,7 +13,7 @@ def estimate_fundamental_matrix(v1, v2):
     x2, y2 = v2[:,0], v2[:,1] # N,
     ones = np.ones(x1.shape[0])
 
-    A = [x1*x2, x1*y2, x1, y1*x2, y1*y2, y1, x2, y2, ones] # N x 9
+    A = [x1*x2, y1*x2, x2, x1*y2, y1*y2, y2, x1, y1, ones] # N x 9
     A = np.vstack(A).T # N x 9
 
     # get SVD of A
@@ -21,22 +21,18 @@ def estimate_fundamental_matrix(v1, v2):
     f = V[np.argmin(sigma),:] # 9,
 
     # reconstruct F from singular vector
-    F = np.array([
-            [f[0],f[3],f[6]],
-            [f[1],f[4],f[7]],
-            [f[2],f[5],f[8]]
-        ])
+    F = f.reshape((3,3))
     #F = F/f[8]
 
     # take SVD of F
     UF, sigmaF, VF = np.linalg.svd(F)
     sigmaF[2] = 0 # enforcing rank 2 constraint
     reestimatedF = UF @ np.diag(sigmaF) @ VF
-    reestimatedF = reestimatedF/reestimatedF[2,2]
+    # reestimatedF = reestimatedF/reestimatedF[2,2]
 
     return F, reestimatedF
 
-def get_ij_fundamental_matrix(i,j,D):
+def get_ij_fundamental_matrix(i,j,sfm_map):
     """
     input:
         i  - first image index
@@ -47,7 +43,7 @@ def get_ij_fundamental_matrix(i,j,D):
         epipoles - List[2, 2,]
     """
     key = (i,j)
-    v1, v2 = D[key]
+    v1, v2, _ = sfm_map.get_feat_matches(key)
     _, F = estimate_fundamental_matrix(v1,v2)
 
     return F
@@ -85,4 +81,3 @@ def get_epipolars(F, v1, v2):
     lines1 = F.T @ v2.T # (3 x 3 @ 3 x N) = 3 x N
     lines2 = F @ v1.T # (3 x 3 @ 3 x N) = 3 x N
     return lines1, lines2
-

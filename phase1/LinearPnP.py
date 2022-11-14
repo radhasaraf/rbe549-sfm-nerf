@@ -39,8 +39,20 @@ def get_camera_extr_using_linear_pnp(features, world_points, K):
     # Get gamma (1st singular value)
     scale = sigmaR[0]
 
+    # Enforce orthogonality
+    R = UR @ VR
+
+    R_det = np.linalg.det(R)
+
+    # R = R if R_det > 0 else -R
+
     # Get T K_inv*p4/gamma
-    T = 1/scale * np.linalg.inv(K) @ P[:,3] # 3 x 1
-    C = -R.T * T
+    T = np.linalg.inv(K) @ P[:,3] / scale  # 3 x 1
+
+    if R_det < 0:
+        R = -R
+        T = -T
+
+    C = -R.T @ T
 
     return R, C
