@@ -1,0 +1,11 @@
+- [*] refined feature matches ransac
+- [*] fundamental matrix 
+- [*] essential matrix
+- [*] epipolars 
+- [*] disambiguate camera poses 
+- [*] linear triangulation 
+- [*] nonlinear triangulation 
+- [ ] bundle adjustment output
+
+- [*] write nonlinear pnp code
+- [*] write buildvisibility matrix code -- not needed since the data structure update is taking care of it

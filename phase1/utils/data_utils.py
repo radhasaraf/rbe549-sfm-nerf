@@ -127,6 +127,9 @@ class SFMMap():
             file_name = match_file.rsplit(".", 1)[0][-1]
             match_file_names.append(file_name)
 
+        matching_files = ['./Data/matching1.txt', './Data/matching2.txt', './Data/matching3.txt', './Data/matching4.txt']
+        match_file_names = ['1','2','3','4']
+
         num_images = len(match_file_names) + 1
         for ith_cam, match_file in zip(match_file_names, matching_files):
             with open(match_file) as file:
@@ -243,7 +246,7 @@ class SFMMap():
         indices_visibility = np.where(self.visibility_matrix[:,i])[0] # M2,
 
         # find intersection of indices_world and indices_visibility
-        indices = list(set(indices_world) & set(indices_visibility))
+        indices = np.array(list(set(indices_world) & set(indices_visibility)))
 
         v = [self.features_u[indices, i], self.features_v[indices, i]]
         v = np.vstack(v).T  # M x 2

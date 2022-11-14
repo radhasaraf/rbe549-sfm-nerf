@@ -52,7 +52,6 @@ def refine_extr_using_PnPRANSAC(features, world_points, K, max_iters=1000, thres
         if np.sum(curr_inliers) > np.sum(max_inliers):
             max_inliers = curr_inliers
 
-    print(f"max_inliers_len:{np.sum(max_inliers)}")
     feature_inliers = features[max_inliers]
     world_point_inliers = world_points[max_inliers]
 

@@ -39,7 +39,7 @@ def show_before_after_RANSAC(imgs, test_key, matches_before, matches_after):
     show_matches2(img1, img2,[v1, v2], f"before_RANSAC_{test_key}")
     show_matches2(img1, img2,[v1_corrected, v2_corrected], f"after_RANSAC_{test_key}")
 
-def show_disambiguated_and_corrected_poses(Xs_all_poses, X_linear, X_non_linear):
+def show_disambiguated_and_corrected_poses(Xs_all_poses, X_linear, X_non_linear, C):
     plt.figure("camera disambiguation")
     colors = ['red','brown','greenyellow','teal']
     for color, X_c in zip(colors, Xs_all_poses):
@@ -47,6 +47,8 @@ def show_disambiguated_and_corrected_poses(Xs_all_poses, X_linear, X_non_linear)
 
     plt.figure("linear triangulation")
     plt.scatter(X_linear[:, 0], X_linear[:, 2], color='skyblue', marker='.')
+    plt.scatter(0, 0, marker='^', s=20)
 
     plt.figure("nonlinear triangulation")
     plt.scatter(X_non_linear[:, 0], X_non_linear[:, 2], color='red', marker='x')
+    plt.scatter(C[0], C[1], marker='^', s=20)

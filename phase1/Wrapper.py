@@ -12,6 +12,7 @@ from DisambiguateCameraPose import *
 from NonlinearTriangulation import refine_triangulated_coords
 from LinearPnP import get_camera_extr_using_linear_pnp
 from PnPRANSAC import refine_extr_using_PnPRANSAC
+from BundleAdjustment import perform_BundleAdjustment
 # from matplotlib import pyplot as plt
 from ShowOutputs import *
 
@@ -75,7 +76,7 @@ def main(args):
     for pair in img_pairs:
         # Refine matches using RANSAC
         vi, vj, orig_idxs = sfm_map.get_feat_matches(pair)
-        inlier_idxs = perform_RANSAC(vi, vj, 1000, 0.01)
+        inlier_idxs = perform_RANSAC(vi, vj, 1000, 0.5)
 
         inlier_orig_indices = orig_idxs[np.where(inlier_idxs)[0]]
         outlier_set = set(orig_idxs) - set(inlier_orig_indices)
@@ -90,13 +91,14 @@ def main(args):
 
     # estimate Fundamental matrix (F)
     F = get_ij_fundamental_matrix(1, 2, sfm_map)
+    print(f"Fundamental_matrix_12:{F}")
     if args.debug:
         matches_after = sfm_map.get_feat_matches((1,2))
         show_epipolars(imgs[1], imgs[2], F, matches_after, f"epipolars_1_2")
 
     # estimate essential matrix E from Fundamental matrix F
     E = essential_from_fundamental(K, F, args)
-
+    print(f"Essential_matrix_12:{E}")
     if args.debug:
         test_E(K, F, E, imgs[1], imgs[2], "epipoles_from_E_and_F")
 
@@ -119,6 +121,10 @@ def main(args):
         Cs, Rs, Xs_all_poses, orig_idxs_12
     )
 
+    # remove the outliers from sfmMap
+    outlier_idxs_12 = np.array(list(set(orig_idxs_12) - set(mod_idxs_12)))
+    sfm_map.remove_matches((1,2), outlier_idxs_12)
+
     # perform non-linear triangulation
     X_non_linear = refine_triangulated_coords(K, C0, R0, C, R, v1, v2, X_linear)
 
@@ -126,12 +132,7 @@ def main(args):
     sfm_map.add_world_points(X_non_linear, mod_idxs_12)
 
     if args.debug:
-        show_disambiguated_and_corrected_poses(Xs_all_poses, X_linear, X_non_linear)
-
-    if args.debug or args.display:
-        plt.show()
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        show_disambiguated_and_corrected_poses(Xs_all_poses, X_linear, X_non_linear, C)
 
     r_mats = [np.eye(3), R]
     t_vecs = [np.zeros(3), C]
@@ -145,7 +146,10 @@ def main(args):
         r_mats.append(R_new)
         t_vecs.append(C_new)
 
-        # X_new = triangulate_points(K, C0, R0, C_new, R_new, )
+        X_new_linear = triangulate_points(K, C0, R0, C_new, R_new, v1, img_points)
+        X_new_non_linear = refine_triangulated_coords(K, C0, R0, C_new, R_new, v1, img_points, X_non_linear)
+
+        R_new, C_new, X_all = perform_BundleAdjustment(sfm_map, C_new, R_new, K, ith_view)
 
     if args.display:
         show_pnp_poses(t_vecs)
