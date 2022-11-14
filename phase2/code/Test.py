@@ -280,6 +280,7 @@ def test(args):
         image = image.detach().cpu().numpy()
         image = normalize(image)
         images.append(image)
+        cv2.imwrite(f"../images_folder/write_{index}.png", cv2.cvtColor(cv2.resize(image, (600, 600), cv2.INTER_AREA), cv2.COLOR_BGR2RGB))
     
     imageio.mimwrite("lego_gif.mp4", images, fps=30, quality=7, macro_block_size=None)
 
