@@ -58,11 +58,11 @@ Reconstruction of a 3d scene from a set of images with different view points (ca
 <img src="phase1/results/nonlinear_triangulation.png"/>
 </p>
 
-#### Camera Registration using Perspective-n-Points (PnP)
+<!-- #### Camera Registration using Perspective-n-Points (PnP)
 
 #### NonLinear PnP
 
-#### Bundle Adjustment
+#### Bundle Adjustment -->
 
 ## Collaborators
 Sai Ramana Kiran - spinnamaraju@wpi.edu
