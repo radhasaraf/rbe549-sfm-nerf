@@ -12,7 +12,7 @@ from DisambiguateCameraPose import *
 from NonlinearTriangulation import refine_triangulated_coords
 from LinearPnP import get_camera_extr_using_linear_pnp
 from PnPRANSAC import refine_extr_using_PnPRANSAC
-from BundleAdjustment import perform_BundleAdjustment
+# from BundleAdjustment import perform_BundleAdjustment
 # from matplotlib import pyplot as plt
 from ShowOutputs import *
 
@@ -146,10 +146,10 @@ def main(args):
         r_mats.append(R_new)
         t_vecs.append(C_new)
 
-        X_new_linear = triangulate_points(K, C0, R0, C_new, R_new, v1, img_points)
-        X_new_non_linear = refine_triangulated_coords(K, C0, R0, C_new, R_new, v1, img_points, X_non_linear)
+        X_new_linear = triangulate_points(K, C0, R0, C_new, R_new, v1, img_pts)
+        X_new_non_linear = refine_triangulated_coords(K, C0, R0, C_new, R_new, v1, img_pts, X_non_linear)
 
-        R_new, C_new, X_all = perform_BundleAdjustment(sfm_map, C_new, R_new, K, ith_view)
+        # R_new, C_new, X_all = perform_BundleAdjustment(sfm_map, C_new, R_new, K, ith_view)
 
     if args.display:
         show_pnp_poses(t_vecs)
